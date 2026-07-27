@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Last Call</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#14101F; --ink2:#1D1730; --ink3:#2A2142; --line:#372C52;
+  --amber:#E8A33D; --amber-hot:#FFC061; --magenta:#FF4D8D;
+  --teal:#3DD9B0; --violet:#8B7BFF; --paper:#F5EFE6;
+  --dim:#9C92AE; --dim2:#6E6484;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{background:#0A0810;font-family:'Archivo',system-ui,sans-serif;color:var(--paper);
+  display:flex;align-items:center;justify-content:center;padding:24px 12px;
+  background-image:radial-gradient(ellipse 80% 50% at 50% -10%, rgba(232,163,61,.10), transparent 60%),
+                   radial-gradient(ellipse 60% 40% at 90% 110%, rgba(255,77,141,.08), transparent 60%)}
+.phone{width:100%;max-width:400px;height:min(880px,calc(100vh - 48px));background:var(--ink);
+  border:1px solid var(--line);border-radius:32px;overflow:hidden;display:flex;flex-direction:column;
+  position:relative;box-shadow:0 40px 80px -20px rgba(0,0,0,.8)}
+
+header{padding:20px 20px 14px;border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg, rgba(232,163,61,.07), transparent);flex-shrink:0}
+.eyebrow{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--dim2);display:flex;justify-content:space-between;align-items:center}
+.live{color:var(--magenta);display:flex;align-items:center;gap:5px}
+.live.closed{color:var(--dim2)}
+.live.offline{color:var(--dim2)}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 2s infinite}
+.live.closed .dot{animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+h1{font-family:'Anton',sans-serif;font-size:34px;letter-spacing:.02em;line-height:1;margin:8px 0 12px;text-transform:uppercase}
+.totals{display:flex;gap:20px;align-items:baseline}
+.tot-big{font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;color:var(--amber)}
+.tot-lbl{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim2)}
+.tot-sub{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--dim)}
+
+nav{display:flex;border-bottom:1px solid var(--line);flex-shrink:0}
+nav button{flex:1;background:none;border:none;cursor:pointer;padding:13px 0;
+  font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--dim2);border-bottom:2px solid transparent;transition:.18s}
+nav button[aria-selected="true"]{color:var(--amber);border-bottom-color:var(--amber)}
+
+main{flex:1;overflow-y:auto;overscroll-behavior:contain}
+main::-webkit-scrollbar{width:0}
+.pane{display:none;padding:18px 20px 120px}
+.pane.on{display:block}
+
+.stop{margin-bottom:26px}
+.stop-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.stop-idx{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink);background:var(--amber);
+  width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-weight:600;flex-shrink:0}
+.stop-name{font-family:'Anton',sans-serif;font-size:17px;letter-spacing:.02em;text-transform:uppercase}
+.stop-time{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim2);margin-left:auto}
+
+.exp{background:var(--ink2);border:1px solid var(--ink3);border-radius:12px;padding:12px 13px;
+  margin-bottom:8px;display:flex;gap:11px;align-items:center;cursor:pointer;
+  animation:slidein .3s ease both;transition:border-color .15s}
+.exp:hover{border-color:var(--line)}
+@keyframes slidein{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.av{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;flex-shrink:0;
+  font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;color:var(--ink)}
+.exp-mid{flex:1;min-width:0}
+.exp-note{font-size:13px;font-weight:600;line-height:1.3}
+.exp-meta{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim2);margin-top:3px}
+.exp-amt{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;text-align:right}
+.exp-split{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--dim2);text-align:right;margin-top:2px}
+.flag{background:none;border:none;cursor:pointer;color:var(--dim2);font-size:14px;padding:2px 4px}
+.flag:hover,.flag.on{color:var(--magenta)}
+.exp.disputed{border-color:rgba(255,77,141,.45);background:rgba(255,77,141,.06)}
+
+.tapline{display:flex;align-items:center;gap:8px;padding:7px 0 15px;
+  font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim2)}
+.tapline .bar{flex:1;height:1px;background:var(--line)}
+.tapline.out{color:var(--magenta)} .tapline.in{color:var(--teal)}
+
+.lastcall{width:100%;margin-top:8px;border:none;border-radius:16px;padding:20px;cursor:pointer;
+  background:linear-gradient(135deg,var(--magenta),#D6336C);color:#fff;font-family:'Anton',sans-serif;
+  font-size:20px;letter-spacing:.08em;text-transform:uppercase;
+  box-shadow:0 10px 30px -8px rgba(255,77,141,.55);transition:transform .12s}
+.lastcall:active{transform:scale(.98)}
+.lastcall:disabled{background:var(--ink3);color:var(--dim2);box-shadow:none;cursor:not-allowed}
+.lastcall small{display:block;font-family:'IBM Plex Mono',monospace;font-size:9.5px;
+  letter-spacing:.1em;opacity:.85;margin-top:5px;font-weight:400}
+
+.prow{padding:14px 0;border-bottom:1px solid var(--ink3)}
+.prow:last-child{border:none}
+.ptop{display:flex;align-items:center;gap:12px}
+.pname{flex:1;font-size:14px;font-weight:600}
+.ptag{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;
+  border-radius:4px;padding:2px 5px;margin-left:6px}
+.tag-dry{color:var(--teal);border:1px solid rgba(61,217,176,.4)}
+.tag-gone{color:var(--magenta);border:1px solid rgba(255,77,141,.4)}
+.tag-host{color:var(--amber);border:1px solid rgba(232,163,61,.4)}
+.pspend{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;text-align:right}
+.pnet{font-family:'IBM Plex Mono',monospace;font-size:10px;text-align:right;margin-top:2px}
+.pos{color:var(--teal)}.neg{color:var(--magenta)}
+.track{height:6px;background:var(--ink3);border-radius:3px;margin:11px 0 8px;position:relative;overflow:hidden}
+.track .span{position:absolute;top:0;bottom:0;border-radius:3px;opacity:.85}
+.pmeta{display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--dim2)}
+.pbtns{display:flex;gap:6px;margin-top:9px}
+.mini-btn{background:none;border:1px solid var(--line);color:var(--dim2);border-radius:6px;
+  font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.07em;padding:6px 9px;
+  cursor:pointer;transition:.15s;text-transform:uppercase}
+.mini-btn.on{border-color:var(--teal);color:var(--teal);background:rgba(61,217,176,.1)}
+.mini-btn.warn.on{border-color:var(--magenta);color:var(--magenta);background:rgba(255,77,141,.1)}
+
+.section-lbl{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--dim2);margin:6px 0 6px}
+.note-box{background:var(--ink2);border:1px solid var(--ink3);border-radius:10px;padding:11px 12px;
+  font-size:11.5px;line-height:1.55;color:var(--dim);margin-bottom:16px}
+.code-chip{font-family:'IBM Plex Mono',monospace;background:var(--ink3);border:1px solid var(--line);
+  border-radius:6px;padding:3px 8px;color:var(--amber-hot);letter-spacing:.14em;font-size:12px}
+
+.receipt{background:var(--paper);color:#1A1520;font-family:'IBM Plex Mono',monospace;font-size:11.5px;
+  line-height:1.65;padding:22px 20px 26px;position:relative;filter:drop-shadow(0 14px 26px rgba(0,0,0,.5));
+  animation:print .7s cubic-bezier(.2,.8,.2,1) both;
+  clip-path:polygon(0 8px,4% 0,8% 8px,12% 0,16% 8px,20% 0,24% 8px,28% 0,32% 8px,36% 0,40% 8px,44% 0,48% 8px,52% 0,56% 8px,60% 0,64% 8px,68% 0,72% 8px,76% 0,80% 8px,84% 0,88% 8px,92% 0,96% 8px,100% 0,100% calc(100% - 8px),96% 100%,92% calc(100% - 8px),88% 100%,84% calc(100% - 8px),80% 100%,76% calc(100% - 8px),72% 100%,68% calc(100% - 8px),64% 100%,60% calc(100% - 8px),56% 100%,52% calc(100% - 8px),48% 100%,44% calc(100% - 8px),40% 100%,36% calc(100% - 8px),32% 100%,28% calc(100% - 8px),24% 100%,20% calc(100% - 8px),16% 100%,12% calc(100% - 8px),8% 100%,4% calc(100% - 8px),0 100%)}
+@keyframes print{from{opacity:0;transform:translateY(-24px) scaleY(.9);transform-origin:top}to{opacity:1;transform:none}}
+.r-center{text-align:center}
+.r-title{font-family:'Anton',sans-serif;font-size:22px;letter-spacing:.06em;margin:4px 0 2px}
+.r-rule{border-top:1px dashed #1A1520;opacity:.45;margin:10px 0}
+.r-line{display:flex;justify-content:space-between;gap:10px}
+.r-muted{opacity:.6}
+.r-pay{display:flex;justify-content:space-between;gap:8px;padding:7px 0;
+  border-bottom:1px dotted rgba(26,21,32,.3);animation:stamp .4s ease both}
+@keyframes stamp{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+.r-big{font-family:'Anton',sans-serif;font-size:15px;letter-spacing:.03em}
+.r-stat{display:flex;justify-content:space-between;font-size:10.5px;opacity:.75}
+.r-dust{font-size:10.5px;opacity:.7;font-style:italic;padding:6px 0 2px}
+.venmo{display:block;width:100%;margin-top:9px;background:#1A1520;color:var(--paper);border:none;
+  border-radius:6px;padding:9px;cursor:pointer;font-family:'IBM Plex Mono',monospace;
+  font-size:10px;letter-spacing:.12em;text-transform:uppercase;text-align:center;text-decoration:none}
+.settled{opacity:.4}
+.preview-tag{background:rgba(232,163,61,.14);border:1px solid rgba(232,163,61,.45);color:var(--amber-hot);
+  border-radius:8px;padding:9px 11px;margin-bottom:14px;font-family:'IBM Plex Mono',monospace;
+  font-size:10px;letter-spacing:.06em;line-height:1.5}
+
+.fab{position:absolute;left:20px;right:20px;bottom:20px;z-index:20;display:flex;gap:10px}
+.fab button{flex:1;border:none;cursor:pointer;border-radius:14px;padding:15px 0;
+  font-family:'Anton',sans-serif;font-size:15px;letter-spacing:.06em;text-transform:uppercase;transition:transform .12s}
+.fab button:active{transform:scale(.97)}
+.fab-main{background:var(--amber);color:var(--ink);box-shadow:0 8px 24px -6px rgba(232,163,61,.5)}
+.fab-alt{flex:0 0 62px !important;background:var(--ink2);color:var(--paper);border:1px solid var(--line) !important}
+
+.scrim{position:absolute;inset:0;background:rgba(6,4,12,.75);backdrop-filter:blur(3px);z-index:30;display:none}
+.scrim.on{display:block;animation:fade .2s both}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:40;background:var(--ink2);
+  border-top:1px solid var(--line);border-radius:22px 22px 0 0;padding:18px 20px 22px;
+  transform:translateY(102%);transition:transform .3s cubic-bezier(.2,.8,.2,1);max-height:90%;overflow-y:auto}
+.sheet.on{transform:none}
+.grab{width:36px;height:4px;background:var(--line);border-radius:2px;margin:0 auto 16px}
+.sheet h2{font-family:'Anton',sans-serif;font-size:18px;letter-spacing:.03em;text-transform:uppercase;margin-bottom:3px}
+.sheet .hint{font-size:11px;color:var(--dim2);margin-bottom:16px;line-height:1.5}
+
+.amount-display{font-family:'IBM Plex Mono',monospace;font-size:36px;font-weight:600;
+  text-align:center;color:var(--amber);padding:6px 0 4px}
+.tip-row{display:flex;gap:6px;justify-content:center;margin-bottom:14px;flex-wrap:wrap}
+.chip{background:var(--ink3);border:1px solid transparent;color:var(--dim);cursor:pointer;
+  border-radius:20px;padding:6px 11px;font-family:'IBM Plex Mono',monospace;font-size:10px;transition:.15s}
+.chip.on{background:rgba(232,163,61,.16);border-color:var(--amber);color:var(--amber-hot)}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.pad button{background:var(--ink3);border:none;color:var(--paper);border-radius:12px;padding:16px 0;
+  font-family:'IBM Plex Mono',monospace;font-size:19px;cursor:pointer}
+.pad button:active{background:var(--line)}
+
+.who{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:6px}
+.who button{border:1px solid var(--line);background:var(--ink3);color:var(--dim2);cursor:pointer;
+  border-radius:20px;padding:7px 12px 7px 8px;display:flex;align-items:center;gap:7px;
+  font-size:12px;font-weight:600;transition:.15s}
+.who button.on{background:rgba(245,239,230,.09);color:var(--paper)}
+.who button.away{opacity:.35;border-style:dashed}
+.who .mini{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;
+  font-family:'IBM Plex Mono',monospace;font-size:8px;font-weight:600;color:var(--ink);opacity:.35}
+.who button.on .mini{opacity:1}
+.who-actions{display:flex;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.link{background:none;border:none;color:var(--amber);cursor:pointer;font-family:'IBM Plex Mono',monospace;
+  font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:4px 0}
+.auto-note{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--dim2);line-height:1.5;margin-bottom:14px}
+
+.shares{background:var(--ink);border:1px solid var(--ink3);border-radius:10px;padding:10px 12px;margin-bottom:14px}
+.shrow{display:flex;align-items:center;gap:10px;padding:6px 0}
+.shrow .nm{flex:1;font-size:12px;font-weight:600}
+.stepper{display:flex;align-items:center;gap:8px}
+.stepper button{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:var(--ink3);
+  color:var(--paper);cursor:pointer;font-size:14px;line-height:1}
+.stepper span{font-family:'IBM Plex Mono',monospace;font-size:12px;width:30px;text-align:center;color:var(--amber)}
+.shrow .amt{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dim2);width:52px;text-align:right}
+
+.confirm{width:100%;border:none;border-radius:14px;padding:16px;cursor:pointer;background:var(--amber);
+  color:var(--ink);font-family:'Anton',sans-serif;font-size:16px;letter-spacing:.06em;text-transform:uppercase}
+.confirm:disabled{background:var(--ink3);color:var(--dim2);cursor:not-allowed}
+.danger{width:100%;background:none;border:1px solid rgba(255,77,141,.4);color:var(--magenta);
+  border-radius:12px;padding:12px;cursor:pointer;margin-top:9px;
+  font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase}
+.cancel{width:100%;background:none;border:none;color:var(--dim2);cursor:pointer;padding:12px;
+  font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+
+.toast{position:absolute;left:20px;right:20px;bottom:96px;z-index:50;background:var(--teal);color:var(--ink);
+  border-radius:11px;padding:11px 14px;font-size:12px;font-weight:600;opacity:0;transform:translateY(10px);
+  transition:.25s;pointer-events:none;z-index:70}
+.toast.on{opacity:1;transform:none}
+.toast.err{background:var(--magenta);color:#fff}
+
+.overlay{position:absolute;inset:0;z-index:60;background:var(--ink);display:none;
+  flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:32px;text-align:center}
+.overlay.on{display:flex;animation:fade .25s both}
+.overlay .big{font-family:'Anton',sans-serif;font-size:26px;letter-spacing:.06em;text-transform:uppercase;color:var(--amber)}
+.overlay .sub{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dim2);letter-spacing:.08em;line-height:1.8}
+.overlay code{background:var(--ink2);border:1px solid var(--line);border-radius:6px;padding:2px 6px;
+  color:var(--amber-hot);font-size:10.5px}
+.overlay input{width:100%;max-width:260px;background:var(--ink2);border:1px solid var(--line);
+  border-radius:10px;padding:13px;color:var(--paper);font-family:'IBM Plex Mono',monospace;
+  font-size:15px;text-align:center;letter-spacing:.1em}
+.overlay button{background:var(--amber);color:var(--ink);border:none;border-radius:12px;padding:14px 26px;
+  cursor:pointer;font-family:'Anton',sans-serif;font-size:15px;letter-spacing:.06em;text-transform:uppercase}
+
+@media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+</style>
+</head>
+<body>
+<div class="phone">
+  <header>
+    <div class="eyebrow">
+      <span id="hdrTitle">—</span>
+      <span class="live offline" id="liveTag"><span class="dot"></span>Connecting…</span>
+    </div>
+    <h1>Last Call</h1>
+    <div class="totals">
+      <div><div class="tot-lbl">Night total</div><div class="tot-big" id="hdrTotal">$0</div></div>
+      <div><div class="tot-lbl">Your tab</div><div class="tot-sub" id="hdrYou">$0</div></div>
+      <div><div class="tot-lbl">Out</div><div class="tot-sub" id="hdrOut">0</div></div>
+    </div>
+  </header>
+
+  <nav role="tablist">
+    <button role="tab" aria-selected="true" data-tab="tonight">Tonight</button>
+    <button role="tab" aria-selected="false" data-tab="crew">Crew</button>
+    <button role="tab" aria-selected="false" data-tab="tab">The Tab</button>
+  </nav>
+
+  <main>
+    <section class="pane on" id="pane-tonight"></section>
+    <section class="pane" id="pane-crew"></section>
+    <section class="pane" id="pane-tab"></section>
+  </main>
+
+  <div class="fab" id="fab" style="display:none">
+    <button class="fab-main" id="btnRound">+ Round</button>
+    <button class="fab-alt" id="btnOther">$</button>
+    <button class="fab-alt" id="btnStop" title="We moved">📍</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <div class="scrim" id="scrim"></div>
+
+  <div class="sheet" id="sheet">
+    <div class="grab"></div>
+    <h2 id="shTitle"></h2>
+    <p class="hint" id="shHint"></p>
+    <div class="section-lbl">Paid by</div>
+    <div class="who" id="payerRow"></div>
+    <div class="amount-display" id="amtDisp"></div>
+    <div class="tip-row" id="tipRow">
+      <button class="chip" data-tip="0">No tip</button>
+      <button class="chip on" data-tip="18">18%</button>
+      <button class="chip" data-tip="20">20%</button>
+      <button class="chip" data-tip="25">25%</button>
+      <button class="chip" data-tip="round">Round up</button>
+    </div>
+    <div class="pad" id="pad"></div>
+    <div class="section-lbl">Splitting between</div>
+    <div class="who" id="splitRow"></div>
+    <div class="auto-note" id="autoNote"></div>
+    <div class="who-actions">
+      <button class="link" id="selPresent">Who's here</button>
+      <button class="link" id="selAll">Everyone</button>
+      <button class="link" id="selNone">Clear</button>
+      <button class="link" id="tglShares">Uneven shares</button>
+    </div>
+    <div class="shares" id="sharesPanel" style="display:none"></div>
+    <button class="confirm" id="confirmBtn"></button>
+    <button class="danger" id="voidBtn" style="display:none">Void this expense</button>
+    <button class="cancel" id="cancelBtn">Cancel</button>
+  </div>
+
+  <div class="sheet" id="stopSheet" style="padding:20px 20px 24px">
+    <div class="grab"></div>
+    <h2>We moved</h2>
+    <p class="hint">Name it if you know it — you can rename later. Leave it blank and it'll just be "Stop N".</p>
+    <input id="stopName" placeholder="e.g. Marlowe's" maxlength="60"
+      style="width:100%;background:var(--ink3);border:1px solid var(--line);border-radius:10px;
+        padding:12px;color:var(--paper);font-family:'Archivo';font-size:14px;margin-bottom:14px">
+    <button class="confirm" id="stopGo">Log the move</button>
+    <button class="cancel" id="stopCancel">Cancel</button>
+  </div>
+
+  <div class="overlay" id="overlay">
+    <div class="big" id="ovTitle">Connecting</div>
+    <div class="sub" id="ovSub">Signing you in…</div>
+    <div id="ovBody"></div>
+  </div>
+</div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+/* ============================================================
+   CONFIG
+   ============================================================ */
+const SUPABASE_URL  = 'https://rkxmpvkhrchgkqocguwt.supabase.co';
+const PUBLISHABLE   = 'sb_publishable_vF8xIr2yzxZRk_ozdHT-bQ_kcOiAEel';
+const DUST_CENTS    = 200;           // $2 materiality threshold
+const DEFAULT_CODE  = 'LASTCALL';    // dev seed night
+
+const sb = createClient(SUPABASE_URL, PUBLISHABLE);
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let me = null;              // person row
+let night = null;
+let members = [];           // night_member joined to person
+let stops = [];
+let expenses = [];          // with allocations attached
+let balances = [];
+let plan = [];              // settle_night rows
+let settledLocal = new Set();
+
+const $  = s => document.querySelector(s);
+const money  = c => '$' + (c/100).toFixed(2);
+const money0 = c => '$' + Math.round(c/100).toLocaleString();
+const clock  = ts => new Date(ts).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+const initials = n => (n||'?').slice(0,2).toUpperCase();
+const PALETTE = ['#E8A33D','#FF4D8D','#3DD9B0','#8B7BFF','#FF8A5B','#6D9EEB','#F2C960'];
+const colorFor = id => PALETTE[[...id].reduce((a,c)=>a+c.charCodeAt(0),0) % PALETTE.length];
+
+const M   = id => members.find(m => m.person_id === id);
+const nameOf = id => M(id)?.person?.display_name ?? '???';
+const isHost = () => night && me && night.host_id === me.id;
+const isOpen = () => night && night.status !== 'closed';
+const presentAt = (m, at) =>
+  new Date(m.joined_at) <= at && (m.left_at === null || new Date(m.left_at) > at);
+const totalOf = e => e.base_cents + e.tip_cents;
+const sumW = e => e.allocation.reduce((s,a)=>s+Number(a.weight),0);
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+async function signInFresh(){
+  const { data, error } = await sb.auth.signInAnonymously();
+  if(error){
+    overlay('Not connected',
+      error.message.match(/disabled|not enabled/i)
+        ? 'Anonymous sign-ins are turned off.<br><br>Enable them in the dashboard:<br><code>Auth → Providers → Anonymous Sign-ins</code>'
+        : 'Sign-in failed: ' + error.message);
+    return null;
+  }
+  return data.session;
+}
+
+// Fetch this session's person row. If it's missing — a stale cached
+// session from before the row existed, or from before anon auth was
+// even switched on — sign out, mint a fresh anonymous session, and
+// try once more rather than crash three lines later on a null.
+async function fetchOrHealPerson(session, alreadyRetried){
+  const { data: person, error } = await sb.from('person')
+    .select('*').eq('id', session.user.id).maybeSingle();
+
+  if(error) throw new Error('Could not load your profile: ' + error.message);
+  if(person) return person;
+
+  if(alreadyRetried){
+    throw new Error('Signed in, but no matching profile exists, and a fresh session didn\'t fix it. ' +
+      'The handle_new_user trigger may be missing.');
+  }
+
+  overlay('Repairing session','Found a stale sign-in — starting fresh…');
+  await sb.auth.signOut();
+  const fresh = await signInFresh();
+  if(!fresh) throw new Error('Could not create a fresh session.');
+  return fetchOrHealPerson(fresh, true);
+}
+
+async function boot(){
+  overlay('Connecting','Signing you in…');
+  let { data: { session } } = await sb.auth.getSession();
+
+  if(!session){
+    session = await signInFresh();
+    if(!session) return;   // signInFresh already showed the error overlay
+  }
+
+  me = await fetchOrHealPerson(session, false);
+
+  // Keep is_permanent in sync with the JWT. This is what makes the
+  // "click the email link, land back here" path just work — no
+  // special-casing needed for the return trip.
+  const { data: nowPermanent } = await sb.rpc('sync_permanence');
+  if(typeof nowPermanent === 'boolean') me.is_permanent = nowPermanent;
+
+  const code = new URLSearchParams(location.search).get('code') || DEFAULT_CODE;
+  const { data: existing, error: exErr } = await sb.from('night_member')
+    .select('night_id').eq('person_id', me.id)
+    .order('joined_at', { ascending: false }).limit(1);
+  if(exErr) throw new Error('Could not check night membership: ' + exErr.message);
+
+  if(existing?.length){
+    await load(existing[0].night_id);
+  } else {
+    await promptJoin(code);
+  }
+}
+
+function promptJoin(code){
+  overlay('Last Call','Join a night, or start your own.');
+  $('#ovBody').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:10px;align-items:center;margin-top:6px;width:100%;max-width:260px">
+      <input id="joinCode" value="${code}" placeholder="CODE" maxlength="12">
+      <input id="joinName" placeholder="Your name" maxlength="24">
+      <button id="joinGo">Join</button>
+      <button id="goStart" style="background:none;border:1px solid var(--line);color:var(--paper);margin-top:6px">Start a Night Out instead</button>
+    </div>`;
+  $('#joinGo').onclick = async () => {
+    const c = $('#joinCode').value.trim();
+    const n = $('#joinName').value.trim() || 'Guest';
+    $('#joinGo').textContent = 'Joining…';
+    const { data, error } = await sb.rpc('join_night', { p_code: c, p_display_name: n });
+    if(error){ $('#ovSub').textContent = error.message; $('#joinGo').textContent = 'Join'; return; }
+    const { data: person, error: pErr } = await sb.from('person').select('*').eq('id', me.id).single();
+    if(pErr || !person){
+      $('#ovSub').textContent = 'Joined, but could not reload your profile: ' + (pErr?.message ?? 'not found');
+      $('#joinGo').textContent = 'Join';
+      return;
+    }
+    me = person;
+    await load(data);
+  };
+  $('#goStart').onclick = () => promptStart();
+}
+
+function promptStart(){
+  if(me.is_permanent){
+    overlay('Start a Night Out','Give it a name — or skip and we\'ll date-stamp it.');
+    $('#ovBody').innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:10px;align-items:center;margin-top:6px;width:100%;max-width:260px">
+        <input id="nightTitle" placeholder="e.g. Dave's Birthday" maxlength="60">
+        <button id="createGo">Create</button>
+        <button id="backToJoin" style="background:none;border:1px solid var(--line);color:var(--paper)">Back</button>
+      </div>`;
+    $('#createGo').onclick = async () => {
+      $('#createGo').textContent = 'Creating…';
+      const { data, error } = await sb.rpc('create_night', { p_title: $('#nightTitle').value.trim() || null });
+      if(error){ $('#ovSub').textContent = error.message; $('#createGo').textContent = 'Create'; return; }
+      const row = Array.isArray(data) ? data[0] : data;
+      showNightCreated(row.night_id, row.join_code);
+    };
+    $('#backToJoin').onclick = () => promptJoin(new URLSearchParams(location.search).get('code') || DEFAULT_CODE);
+    return;
+  }
+
+  // anonymous — needs a durable identity before they can own a night
+  overlay('One thing first','Hosting needs an email — so the night (and what people owe you) survives more than this browser tab.');
+  $('#ovBody').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:10px;align-items:center;margin-top:6px;width:100%;max-width:260px">
+      <input id="hostEmail" type="email" placeholder="you@example.com">
+      <button id="sendLink">Send verification link</button>
+      <button id="backToJoin2" style="background:none;border:1px solid var(--line);color:var(--paper)">Back</button>
+    </div>`;
+  $('#sendLink').onclick = async () => {
+    const email = $('#hostEmail').value.trim();
+    if(!email) return;
+    $('#sendLink').textContent = 'Sending…';
+    const redirectTo = location.href.split('?')[0].split('#')[0];
+    const { error } = await sb.auth.updateUser({ email }, { emailRedirectTo: redirectTo });
+    if(error){ $('#ovSub').textContent = error.message; $('#sendLink').textContent = 'Send verification link'; return; }
+    overlay('Check your email', `Sent a link to <code>${email}</code>.<br><br>Tap it — you'll land right back here, already good to go.`);
+  };
+  $('#backToJoin2').onclick = () => promptJoin(new URLSearchParams(location.search).get('code') || DEFAULT_CODE);
+}
+
+function showNightCreated(nightId, code){
+  overlay('Night Out started','Share this code so people can join.');
+  $('#ovBody').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:12px;align-items:center;margin-top:6px;width:100%;max-width:260px">
+      <div class="code-chip" style="font-size:22px;padding:10px 20px">${code}</div>
+      <button id="copyCode">Copy code</button>
+      <button id="goInside">Let's go</button>
+    </div>`;
+  $('#copyCode').onclick = async () => {
+    try{ await navigator.clipboard.writeText(code); toast('Copied'); }
+    catch{ toast('Copy failed — code is ' + code, true); }
+  };
+  $('#goInside').onclick = () => load(nightId);
+}
+
+async function load(nightId){
+  overlay('Loading','Pulling the tab…');
+
+  const [n, mem, st, exp, bal] = await Promise.all([
+    sb.from('night').select('*').eq('id', nightId).single(),
+    sb.from('night_member').select('*, person(*)').eq('night_id', nightId),
+    sb.from('stop').select('*').eq('night_id', nightId).order('seq'),
+    sb.from('expense').select('*, allocation(*)').eq('night_id', nightId).order('occurred_at'),
+    sb.from('night_balance').select('*').eq('night_id', nightId),
+  ]);
+
+  night    = n.data;
+  members  = (mem.data || []).sort((a,b)=> new Date(a.joined_at) - new Date(b.joined_at));
+  stops    = st.data || [];
+  expenses = exp.data || [];
+  balances = bal.data || [];
+
+  await refreshPlan();
+  hideOverlay();
+  subscribe(nightId);
+  renderAll();
+}
+
+async function refreshPlan(){
+  if(!night) return;
+  const { data, error } = await sb.rpc('settle_night',
+    { p_night_id: night.id, p_dust_cents: DUST_CENTS });
+  plan = error ? [] : (data || []);
+}
+
+/* live sync — any write by anyone reloads the affected slices */
+function subscribe(nightId){
+  sb.channel('night:' + nightId)
+    .on('postgres_changes', { event:'*', schema:'public', table:'expense',      filter:`night_id=eq.${nightId}` }, refresh)
+    .on('postgres_changes', { event:'*', schema:'public', table:'allocation'    }, refresh)
+    .on('postgres_changes', { event:'*', schema:'public', table:'night_member', filter:`night_id=eq.${nightId}` }, refresh)
+    .on('postgres_changes', { event:'*', schema:'public', table:'night',        filter:`id=eq.${nightId}` }, refresh)
+    .subscribe(status => {
+      const t = $('#liveTag');
+      if(status === 'SUBSCRIBED'){
+        t.className = 'live' + (isOpen() ? '' : ' closed');
+        t.innerHTML = `<span class="dot"></span>${isOpen() ? 'Live' : 'Closed'}`;
+      }
+    });
+}
+
+let refreshT;
+function refresh(){
+  clearTimeout(refreshT);
+  refreshT = setTimeout(async () => {
+    const [n, mem, exp, bal] = await Promise.all([
+      sb.from('night').select('*').eq('id', night.id).single(),
+      sb.from('night_member').select('*, person(*)').eq('night_id', night.id),
+      sb.from('expense').select('*, allocation(*)').eq('night_id', night.id).order('occurred_at'),
+      sb.from('night_balance').select('*').eq('night_id', night.id),
+    ]);
+    night    = n.data ?? night;
+    members  = (mem.data || members).sort((a,b)=> new Date(a.joined_at) - new Date(b.joined_at));
+    expenses = exp.data || expenses;
+    balances = bal.data || balances;
+    await refreshPlan();
+    renderAll();
+  }, 220);
+}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+const avatar = id => `<div class="av" style="background:${colorFor(id)}">${initials(nameOf(id))}</div>`;
+
+function renderHeader(){
+  if(!night) return;
+  const now = new Date();
+  const live = expenses.filter(e => e.status !== 'disputed' && e.status !== 'void');
+  const grand = live.reduce((s,e)=> s + totalOf(e), 0);
+  const mine = balances.find(b => b.person_id === me.id);
+  $('#hdrTitle').textContent = night.title;
+  $('#hdrTotal').textContent = money0(grand);
+  $('#hdrYou').textContent   = money0(mine?.owed_cents ?? 0);
+  $('#hdrOut').textContent   = `${members.filter(m => presentAt(m, now)).length}/${members.length}`;
+  $('#fab').style.display    = isOpen() ? 'flex' : 'none';
+}
+
+function renderTonight(){
+  const events = [];
+  expenses.forEach(e => events.push({ t: new Date(e.occurred_at), type:'exp', e }));
+  members.forEach(m => {
+    const first = members[0] && new Date(members[0].joined_at);
+    if(first && new Date(m.joined_at) - first > 60000) events.push({ t:new Date(m.joined_at), type:'in', m });
+    if(m.left_at) events.push({ t:new Date(m.left_at), type:'out', m });
+  });
+
+  const buckets = stops.map((s,i) => {
+    const from = new Date(s.arrived_at);
+    const to   = stops[i+1] ? new Date(stops[i+1].arrived_at) : new Date(8640000000000000);
+    return { s, i, rows: events.filter(v => v.t >= from && v.t < to).sort((a,b)=>a.t-b.t) };
+  }).filter(b => b.rows.length);
+
+  const html = buckets.map(({s,i,rows}) => {
+    const sub = rows.filter(v => v.type==='exp' && v.e.status!=='disputed').reduce((a,v)=>a+totalOf(v.e),0);
+    return `<div class="stop">
+      <div class="stop-head">
+        <div class="stop-idx">${i+1}</div>
+        <div class="stop-name">${s.name ?? 'Stop ' + (i+1)}</div>
+        <div class="stop-time">${clock(s.arrived_at)} · ${money0(sub)}</div>
+      </div>
+      ${rows.map(v => {
+        if(v.type !== 'exp'){
+          return `<div class="tapline ${v.type}"><span class="bar"></span>
+            ${nameOf(v.m.person_id)} ${v.type==='in'?'tapped in':'tapped out'} · ${clock(v.t)}
+            <span class="bar"></span></div>`;
+        }
+        const e = v.e, W = sumW(e), uneven = e.allocation.some(a => Number(a.weight) !== 1);
+        return `<div class="exp ${e.status}" data-edit="${e.id}">
+          ${avatar(e.payer_id)}
+          <div class="exp-mid">
+            <div class="exp-note">${e.note ?? 'Expense'}</div>
+            <div class="exp-meta">${nameOf(e.payer_id)} paid${e.tip_cents?` · ${money(e.tip_cents)} tip`:''}${e.status==='disputed'?' · FLAGGED':''}</div>
+          </div>
+          <div>
+            <div class="exp-amt">${money(totalOf(e))}</div>
+            <div class="exp-split">${uneven?`${W} shares`:`${e.allocation.length}-way`} · ${money(Math.round(totalOf(e)/W))}${uneven?'/sh':''}</div>
+          </div>
+          <button class="flag ${e.status==='disputed'?'on':''}" data-flag="${e.id}">⚑</button>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+
+  $('#pane-tonight').innerHTML = (html || `<div style="text-align:center;padding:50px 10px;color:var(--dim2)">
+      <div style="font-family:Anton;font-size:20px;color:var(--paper)">Nothing logged yet</div>
+      <p style="font-size:13px;margin-top:8px;line-height:1.6">Hit <b>+ Round</b> when someone buys.</p></div>`)
+    + (isOpen() && isHost()
+        ? `<button class="lastcall" id="btnLastCall">Last Call<small>CLOSE THE NIGHT · PRINT THE TAB</small></button>`
+        : isOpen()
+        ? `<button class="lastcall" disabled>Last Call<small>ONLY ${nameOf(night.host_id).toUpperCase()} CAN CLOSE THE NIGHT</small></button>`
+        : '');
+
+  $('#pane-tonight').querySelectorAll('[data-flag]').forEach(b => b.onclick = async ev => {
+    ev.stopPropagation();
+    const e = expenses.find(x => x.id === b.dataset.flag);
+    const next = e.status === 'disputed' ? 'confirmed' : 'disputed';
+    const { error } = await sb.from('expense').update({ status: next }).eq('id', e.id);
+    if(error) return toast(error.message, true);
+    toast(next === 'disputed' ? 'Flagged — held out of the tab' : 'Unflagged');
+  });
+  $('#pane-tonight').querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openEdit(b.dataset.edit));
+  const lc = $('#btnLastCall'); if(lc) lc.onclick = doLastCall;
+}
+
+function renderCrew(){
+  const now = new Date();
+  const t0 = members.length ? new Date(members[0].joined_at) : now;
+  const span = Math.max(now - t0, 1);
+
+  $('#pane-crew').innerHTML =
+    `<div class="note-box"><b style="color:var(--paper)">Presence drives the split.</b><br>
+      Tap someone out when they leave and every expense logged after that skips them automatically.
+      ${isHost() ? `<br><br>Join code: <span class="code-chip">${night.join_code}</span>` : ''}
+      <br><br><button class="link" id="btnSwitchNight" style="padding:0">Not this night? Switch</button></div>` +
+    `<div class="section-lbl">Who was out</div>` +
+    members.map(m => {
+      const b = balances.find(x => x.person_id === m.person_id) ?? {paid_cents:0,owed_cents:0,net_cents:0};
+      const jt = new Date(m.joined_at), lt = m.left_at ? new Date(m.left_at) : now;
+      const start = ((jt - t0)/span)*100, end = ((lt - t0)/span)*100;
+      const here = presentAt(m, now);
+      const isMe = m.person_id === me.id;
+      const canEdit = isMe || isHost();
+      return `<div class="prow">
+        <div class="ptop">
+          ${avatar(m.person_id)}
+          <div class="pname">${m.person.display_name}${isMe?' (you)':''}
+            ${m.role==='host'?'<span class="ptag tag-host">Host</span>':''}
+            ${m.is_dry?'<span class="ptag tag-dry">Not drinking</span>':''}
+            ${!here?'<span class="ptag tag-gone">Gone</span>':''}</div>
+          <div style="min-width:84px">
+            <div class="pspend">${money(b.owed_cents)}</div>
+            <div class="pnet ${b.net_cents>=0?'pos':'neg'}">${b.net_cents>=0?'is owed ':'owes '}${money(Math.abs(b.net_cents))}</div>
+          </div>
+        </div>
+        <div class="track"><div class="span" style="left:${start}%;width:${Math.max(end-start,2)}%;background:${colorFor(m.person_id)}"></div></div>
+        <div class="pmeta"><span>IN ${clock(m.joined_at)}</span>
+          <span>${m.left_at ? 'OUT ' + clock(m.left_at) : 'STILL OUT'}</span></div>
+        ${canEdit && isOpen() ? `<div class="pbtns">
+          <button class="mini-btn warn ${!here?'on':''}" data-tap="${m.person_id}">${here?'Tap out':'Tap back in'}</button>
+          <button class="mini-btn ${m.is_dry?'on':''}" data-dry="${m.person_id}">Not drinking</button>
+        </div>` : ''}
+      </div>`;
+    }).join('');
+
+  $('#pane-crew').querySelectorAll('[data-tap]').forEach(b => b.onclick = async () => {
+    const m = M(b.dataset.tap), now = new Date();
+    const patch = presentAt(m, now) ? { left_at: now.toISOString() } : { left_at: null };
+    const { error } = await sb.from('night_member').update(patch)
+      .eq('night_id', night.id).eq('person_id', m.person_id);
+    if(error) return toast(error.message, true);
+    toast(patch.left_at ? `${nameOf(m.person_id)} tapped out` : `${nameOf(m.person_id)} is back in`);
+  });
+  $('#pane-crew').querySelectorAll('[data-dry]').forEach(b => b.onclick = async () => {
+    const m = M(b.dataset.dry);
+    const { error } = await sb.from('night_member').update({ is_dry: !m.is_dry })
+      .eq('night_id', night.id).eq('person_id', m.person_id);
+    if(error) return toast(error.message, true);
+  });
+
+  const sw = $('#btnSwitchNight');
+  if(sw) sw.onclick = () => {
+    // Doesn't delete or leave anything — you're still a member of this
+    // night. Just re-opens the chooser so you can join or start another.
+    // Whichever one you enter next becomes the resume target on reload,
+    // since boot() picks the most recently joined membership.
+    promptJoin(new URLSearchParams(location.search).get('code') || DEFAULT_CODE);
+  };
+}
+
+function renderTab(){
+  const live = expenses.filter(e => e.status !== 'disputed' && e.status !== 'void');
+  const grand = live.reduce((s,e)=>s+totalOf(e),0);
+  const tips  = live.reduce((s,e)=>s+e.tip_cents,0);
+  const flagged = expenses.filter(e => e.status === 'disputed');
+  const collect = plan.filter(p => !p.is_dust);
+  const dust    = plan.filter(p =>  p.is_dust);
+  const dustTot = dust.reduce((s,p)=>s+p.amount_cents,0);
+  const naive = expenses.filter(e=>e.status!=='disputed')
+    .reduce((n,e)=> n + e.allocation.filter(a=>a.person_id!==e.payer_id).length, 0);
+
+  $('#pane-tab').innerHTML =
+    (isOpen() ? `<div class="preview-tag">PREVIEW · NIGHT STILL OPEN<br>
+      These numbers move as people log rounds.</div>` : '') +
+    `<div class="receipt">
+      <div class="r-center">
+        <div class="r-title">LAST CALL</div>
+        <div class="r-muted">${isOpen()?'RUNNING TAB':'TAB CLOSED'} · ${night.title}</div>
+        <div class="r-muted">${stops.map(s=>s.name).filter(Boolean).join(' → ')}</div>
+      </div>
+      <div class="r-rule"></div>
+      <div class="r-line"><span>Subtotal</span><span>${money(grand-tips)}</span></div>
+      <div class="r-line"><span>Tips</span><span>${money(tips)}</span></div>
+      <div class="r-line"><b>NIGHT TOTAL</b><b>${money(grand)}</b></div>
+      <div class="r-rule"></div>
+      <div class="r-center r-big">WHO PAYS WHO</div>
+      <div class="r-center r-muted" style="margin-bottom:8px">${naive} debts → ${collect.length} payment${collect.length===1?'':'s'}</div>
+      ${collect.length ? collect.map((p,i) => {
+        const done = settledLocal.has(i);
+        const handle = M(p.to_person)?.person?.venmo_handle;
+        return `<div class="r-pay ${done?'settled':''}" style="animation-delay:${i*.08}s">
+          <span><b>${nameOf(p.from_person)}</b> → ${nameOf(p.to_person)}</span><b>${money(p.amount_cents)}</b></div>
+        ${done ? '' : (p.from_person === me.id
+          ? `<a class="venmo" target="_blank" rel="noopener"
+               href="https://venmo.com/?txn=pay${handle?'&audience=private&recipients='+encodeURIComponent(handle):''}&amount=${(p.amount_cents/100).toFixed(2)}&note=${encodeURIComponent(night.title)}">Pay in Venmo</a>`
+          : `<button class="venmo" data-pay="${i}">Mark received</button>`)}`;
+      }).join('') : `<div class="r-center r-muted" style="padding:14px 0">All square.</div>`}
+      ${dustTot ? `<div class="r-dust">Written off under $${(DUST_CENTS/100).toFixed(2)}: ${money(dustTot)}
+        (${dust.map(p=>nameOf(p.from_person)).join(', ')})</div>` : ''}
+      ${flagged.length ? `<div class="r-rule"></div>
+        <div class="r-muted r-center">⚑ ${flagged.length} flagged &amp; excluded</div>
+        ${flagged.map(e=>`<div class="r-line r-muted"><span>${e.note}</span><span>${money(totalOf(e))}</span></div>`).join('')}`:''}
+      <div class="r-rule"></div>
+      <div class="r-stat"><span>Rounds bought</span><span>${expenses.filter(e=>e.kind==='round').length}</span></div>
+      <div class="r-stat"><span>Most generous</span><span>${extreme(1)}</span></div>
+      <div class="r-stat"><span>Cheapest date</span><span>${extreme(-1)}</span></div>
+      <div class="r-rule"></div>
+      <div class="r-center r-muted">*** THAT'S LAST CALL, FOLKS ***</div>
+    </div>`;
+
+  $('#pane-tab').querySelectorAll('[data-pay]').forEach(b => b.onclick = () => {
+    settledLocal.add(+b.dataset.pay);
+    toast('Marked received — we never move the money');
+    renderTab();
+  });
+}
+function extreme(dir){
+  const s = [...balances].sort((a,b)=> dir*(b.paid_cents - a.paid_cents))[0];
+  return s ? `${nameOf(s.person_id)} (${money0(s.paid_cents)})` : '—';
+}
+
+function renderAll(){ if(!night) return; renderHeader(); renderTonight(); renderCrew(); renderTab(); }
+
+/* ---------- tabs ---------- */
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x => x.setAttribute('aria-selected', x === b));
+  document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'pane-' + b.dataset.tab));
+  $('#fab').style.display = (b.dataset.tab === 'tab' || !isOpen()) ? 'none' : 'flex';
+  $('main').scrollTop = 0;
+});
+const goTab = n => document.querySelector(`nav button[data-tab="${n}"]`).click();
+
+/* ---------- last call ---------- */
+async function doLastCall(){
+  overlay('Closing out','NETTING THE LEDGER…');
+  const { error } = await sb.rpc('close_night', { p_night_id: night.id, p_dust_cents: DUST_CENTS });
+  if(error){ hideOverlay(); return toast(error.message, true); }
+  await refresh();
+  setTimeout(() => { hideOverlay(); goTab('tab'); toast('Tab closed.'); }, 900);
+}
+
+/* ============================================================
+   ADD / EDIT SHEET
+   ============================================================ */
+let draft = null;
+const baseOf = () => draft.editing ? draft.base : parseInt(draft.digits || '0', 10);
+const tipOf  = () => {
+  const b = baseOf();
+  if(draft.editing) return draft.fixedTip;
+  return draft.tip === 'round' ? Math.ceil(b/500)*500 - b : Math.round(b * draft.tip / 100);
+};
+const wSum = () => draft.alloc.reduce((s,a)=>s+a.w, 0);
+
+function eligible(kind, at){
+  return members.filter(m => presentAt(m, at) && !(kind === 'round' && m.is_dry)).map(m => m.person_id);
+}
+
+function openAdd(kind){
+  const at = new Date();
+  draft = { editing:null, kind, payer: me.id, digits:'', tip: kind==='round'?18:0,
+            showShares:false, at, alloc: eligible(kind, at).map(p => ({p, w:1})) };
+  $('#shTitle').textContent = kind === 'round' ? "Who's buying?" : 'Log an expense';
+  $('#shHint').textContent  = kind === 'round'
+    ? 'Split defaults to whoever is out right now, minus anyone not drinking.'
+    : "Cover, cab, coat check, cash tip — anything that isn't a round.";
+  $('#pad').style.display = 'grid';
+  $('#voidBtn').style.display = 'none';
+  show();
+}
+function openEdit(id){
+  if(!isOpen()) return toast('Tab is closed', true);
+  const e = expenses.find(x => x.id === id);
+  draft = { editing:id, kind:e.kind, payer:e.payer_id, base:e.base_cents, fixedTip:e.tip_cents,
+            showShares: e.allocation.some(a => Number(a.weight) !== 1), at: new Date(e.occurred_at),
+            alloc: e.allocation.map(a => ({ p:a.person_id, w:Number(a.weight) })) };
+  $('#shTitle').textContent = 'Edit expense';
+  $('#shHint').textContent = `${e.note ?? 'Expense'} · logged ${clock(e.occurred_at)}. Drop someone out or give them a bigger share.`;
+  $('#pad').style.display = 'none';
+  $('#voidBtn').style.display = 'block';
+  show();
+}
+function show(){ renderSheet(); $('#scrim').classList.add('on'); $('#sheet').classList.add('on'); }
+function close(){ $('#scrim').classList.remove('on'); $('#sheet').classList.remove('on'); }
+
+function renderSheet(){
+  const at = draft.at;
+  $('#payerRow').innerHTML = members.map(m => `
+    <button class="${draft.payer===m.person_id?'on':''} ${presentAt(m,at)?'':'away'}" data-payer="${m.person_id}">
+      <span class="mini" style="background:${colorFor(m.person_id)}">${initials(m.person.display_name)}</span>${m.person.display_name}</button>`).join('');
+  $('#payerRow').querySelectorAll('[data-payer]').forEach(b => b.onclick = () => { draft.payer = b.dataset.payer; renderSheet(); });
+
+  const tot = baseOf() + tipOf(), W = wSum() || 1;
+  $('#amtDisp').innerHTML = tot
+    ? `${money(tot)}<span style="font-size:12px;color:var(--dim2);display:block;margin-top:2px">
+        ${money(baseOf())} + ${money(tipOf())} tip${draft.alloc.length?` · ${money(Math.round(tot/W))}/share`:''}</span>`
+    : `$0.00<span style="font-size:12px;color:var(--dim2);display:block;margin-top:2px">tap the keypad</span>`;
+
+  $('#tipRow').style.display = draft.editing ? 'none' : 'flex';
+  $('#tipRow').querySelectorAll('.chip').forEach(c => {
+    c.classList.toggle('on', String(draft.tip) === c.dataset.tip);
+    c.onclick = () => { draft.tip = c.dataset.tip === 'round' ? 'round' : +c.dataset.tip; renderSheet(); };
+  });
+
+  const inSplit = id => draft.alloc.some(a => a.p === id);
+  $('#splitRow').innerHTML = members.map(m => `
+    <button class="${inSplit(m.person_id)?'on':''} ${presentAt(m,at)?'':'away'}" data-split="${m.person_id}">
+      <span class="mini" style="background:${colorFor(m.person_id)}">${initials(m.person.display_name)}</span>${m.person.display_name}</button>`).join('');
+  $('#splitRow').querySelectorAll('[data-split]').forEach(b => b.onclick = () => {
+    const id = b.dataset.split;
+    draft.alloc = inSplit(id) ? draft.alloc.filter(a => a.p !== id) : [...draft.alloc, {p:id, w:1}];
+    renderSheet();
+  });
+
+  const away = members.filter(m => !presentAt(m, at));
+  const dry  = members.filter(m => m.is_dry && presentAt(m, at));
+  const bits = [];
+  if(away.length) bits.push(`${away.map(m=>m.person.display_name).join(', ')} not here — excluded automatically.`);
+  if(dry.length && draft.kind === 'round') bits.push(`${dry.map(m=>m.person.display_name).join(', ')} not drinking — off this round.`);
+  $('#autoNote').textContent = bits.join(' ');
+
+  $('#tglShares').textContent = draft.showShares ? 'Even split' : 'Uneven shares';
+  const sp = $('#sharesPanel');
+  sp.style.display = draft.showShares ? 'block' : 'none';
+  if(draft.showShares){
+    sp.innerHTML = draft.alloc.map(a => `
+      <div class="shrow">
+        <span class="mini" style="background:${colorFor(a.p)};width:20px;height:20px;border-radius:50%;
+          display:grid;place-items:center;font-family:'IBM Plex Mono';font-size:8px;color:var(--ink);font-weight:600">${initials(nameOf(a.p))}</span>
+        <span class="nm">${nameOf(a.p)}</span>
+        <span class="stepper"><button data-w="${a.p}" data-d="-1">−</button><span>${a.w}×</span><button data-w="${a.p}" data-d="1">+</button></span>
+        <span class="amt">${money(Math.round(tot*a.w/W))}</span></div>`).join('')
+      || `<div style="font-size:11px;color:var(--dim2);padding:4px 0">Nobody on this expense yet.</div>`;
+    sp.querySelectorAll('[data-w]').forEach(b => b.onclick = () => {
+      const a = draft.alloc.find(x => x.p === b.dataset.w);
+      a.w = Math.max(1, Math.min(6, a.w + (+b.dataset.d)));
+      renderSheet();
+    });
+  }
+
+  const ok = draft.alloc.length > 0 && (draft.editing || baseOf() > 0);
+  $('#confirmBtn').disabled = !ok;
+  $('#confirmBtn').textContent = !draft.alloc.length ? "Pick who it's for"
+    : draft.editing ? `Save · ${draft.alloc.length} on it` : `Log ${money(tot)} · ${draft.alloc.length}-way`;
+}
+
+$('#pad').innerHTML = ['1','2','3','4','5','6','7','8','9','·','0','⌫']
+  .map(k => `<button data-k="${k}">${k}</button>`).join('');
+$('#pad').querySelectorAll('button').forEach(b => b.onclick = () => {
+  const k = b.dataset.k;
+  if(k === '⌫') draft.digits = draft.digits.slice(0,-1);
+  else if(k === '·') draft.digits += '00';
+  else if(draft.digits.length < 7) draft.digits += k;
+  renderSheet();
+});
+
+$('#selPresent').onclick = () => { draft.alloc = eligible(draft.kind, draft.at).map(p=>({p,w:1})); renderSheet(); };
+$('#selAll').onclick     = () => { draft.alloc = members.map(m=>({p:m.person_id,w:1})); renderSheet(); };
+$('#selNone').onclick    = () => { draft.alloc = []; renderSheet(); };
+$('#tglShares').onclick  = () => { if(draft.showShares) draft.alloc.forEach(a=>a.w=1); draft.showShares=!draft.showShares; renderSheet(); };
+$('#btnRound').onclick   = () => openAdd('round');
+$('#btnOther').onclick   = () => openAdd('other');
+$('#btnStop').onclick    = () => openNewStop();
+$('#cancelBtn').onclick  = close;
+$('#scrim').onclick      = () => { close(); closeStopSheet(); };
+
+function openNewStop(){
+  $('#stopName').value = '';
+  $('#scrim').classList.add('on');
+  $('#stopSheet').classList.add('on');
+}
+function closeStopSheet(){ $('#stopSheet').classList.remove('on'); $('#scrim').classList.remove('on'); }
+$('#stopCancel').onclick = closeStopSheet;
+$('#stopGo').onclick = async () => {
+  $('#stopGo').disabled = true;
+  const { error } = await sb.rpc('add_stop', { p_night_id: night.id, p_name: $('#stopName').value.trim() || null });
+  closeStopSheet();
+  $('#stopGo').disabled = false;
+  toast(error ? error.message : 'Logged the move', !!error);
+};
+
+$('#voidBtn').onclick = async () => {
+  const { error } = await sb.from('expense').delete().eq('id', draft.editing);
+  close();
+  toast(error ? error.message : 'Voided', !!error);
+};
+
+$('#confirmBtn').onclick = async () => {
+  $('#confirmBtn').disabled = true;
+
+  if(draft.editing){
+    const { error: e1 } = await sb.from('expense').update({ payer_id: draft.payer }).eq('id', draft.editing);
+    if(e1){ close(); return toast(e1.message, true); }
+    await sb.from('allocation').delete().eq('expense_id', draft.editing);
+    const { error: e2 } = await sb.from('allocation').insert(
+      draft.alloc.map(a => ({ expense_id: draft.editing, person_id: a.p, weight: a.w })));
+    close();
+    return toast(e2 ? e2.message : 'Updated — balances recalculated', !!e2);
+  }
+
+  const stop = stops[stops.length - 1];
+  const n = expenses.filter(e => e.kind === 'round').length + 1;
+  const { data, error } = await sb.from('expense').insert({
+    night_id: night.id, stop_id: stop?.id ?? null, payer_id: draft.payer,
+    base_cents: baseOf(), tip_cents: tipOf(), kind: draft.kind,
+    note: draft.kind === 'round' ? `Round ${n}` : 'Expense',
+    created_by: me.id
+  }).select().single();
+
+  if(error){ close(); return toast(error.message, true); }
+
+  const { error: aerr } = await sb.from('allocation').insert(
+    draft.alloc.map(a => ({ expense_id: data.id, person_id: a.p, weight: a.w })));
+  close();
+  toast(aerr ? aerr.message : `Logged · ${money(baseOf()+tipOf())} across ${draft.alloc.length}`, !!aerr);
+};
+
+/* ---------- chrome ---------- */
+let tT;
+function toast(msg, isErr = false){
+  const t = $('#toast');
+  t.textContent = msg;
+  t.className = 'toast on' + (isErr ? ' err' : '');
+  clearTimeout(tT);
+  tT = setTimeout(() => t.className = 'toast', 3200);
+}
+function overlay(title, sub){
+  $('#ovTitle').textContent = title;
+  $('#ovSub').innerHTML = sub;
+  $('#ovBody').innerHTML = '';
+  $('#overlay').classList.add('on');
+}
+function hideOverlay(){ $('#overlay').classList.remove('on'); }
+
+boot().catch(e => overlay('Something broke', e.message));
+</script>
+</body>
+</html>
