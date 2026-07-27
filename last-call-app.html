@@ -79,10 +79,10 @@ main::-webkit-scrollbar{width:0}
 .tapline .bar{flex:1;height:1px;background:var(--line)}
 .tapline.out{color:var(--magenta)} .tapline.in{color:var(--teal)}
 
-.lastcall{width:100%;margin-top:8px;border:none;border-radius:16px;padding:20px;cursor:pointer;
+.lastcall{width:100%;margin-top:8px;border:none;border-radius:14px;padding:13px;cursor:pointer;
   background:linear-gradient(135deg,var(--magenta),#D6336C);color:#fff;font-family:'Anton',sans-serif;
-  font-size:20px;letter-spacing:.08em;text-transform:uppercase;
-  box-shadow:0 10px 30px -8px rgba(255,77,141,.55);transition:transform .12s}
+  font-size:15px;letter-spacing:.07em;text-transform:uppercase;
+  box-shadow:0 8px 22px -8px rgba(255,77,141,.5);transition:transform .12s}
 .lastcall:active{transform:scale(.98)}
 .lastcall:disabled{background:var(--ink3);color:var(--dim2);box-shadow:none;cursor:not-allowed}
 .lastcall small{display:block;font-family:'IBM Plex Mono',monospace;font-size:9.5px;
@@ -217,7 +217,7 @@ main::-webkit-scrollbar{width:0}
   color:var(--amber-hot);font-size:10.5px}
 .overlay input{width:100%;max-width:260px;background:var(--ink2);border:1px solid var(--line);
   border-radius:10px;padding:13px;color:var(--paper);font-family:'IBM Plex Mono',monospace;
-  font-size:15px;text-align:center;letter-spacing:.1em}
+  font-size:16px;text-align:center;letter-spacing:.1em}
 .overlay button{background:var(--amber);color:var(--ink);border:none;border-radius:12px;padding:14px 26px;
   cursor:pointer;font-family:'Anton',sans-serif;font-size:15px;letter-spacing:.06em;text-transform:uppercase}
 
@@ -268,11 +268,10 @@ main::-webkit-scrollbar{width:0}
     <div class="who" id="payerRow"></div>
     <div class="amount-display" id="amtDisp"></div>
     <div class="tip-row" id="tipRow">
-      <button class="chip" data-tip="0">No tip</button>
-      <button class="chip on" data-tip="18">18%</button>
+      <button class="chip on" data-tip="0">No tip</button>
+      <button class="chip" data-tip="18">18%</button>
       <button class="chip" data-tip="20">20%</button>
       <button class="chip" data-tip="25">25%</button>
-      <button class="chip" data-tip="round">Round up</button>
     </div>
     <div class="pad" id="pad"></div>
     <div class="section-lbl">Splitting between</div>
@@ -296,7 +295,7 @@ main::-webkit-scrollbar{width:0}
     <p class="hint">Name it if you know it — you can rename later. Leave it blank and it'll just be "Stop N".</p>
     <input id="stopName" placeholder="e.g. Marlowe's" maxlength="60"
       style="width:100%;background:var(--ink3);border:1px solid var(--line);border-radius:10px;
-        padding:12px;color:var(--paper);font-family:'Archivo';font-size:14px;margin-bottom:14px">
+        padding:12px;color:var(--paper);font-family:'Archivo';font-size:16px;margin-bottom:14px">
     <button class="confirm" id="stopGo">Log the move</button>
     <button class="cancel" id="stopCancel">Cancel</button>
   </div>
@@ -482,15 +481,22 @@ function promptStart(){
   overlay('Start a Night Out','Give it a name — or skip and we\'ll date-stamp it.');
   $('#ovBody').innerHTML = `
     <div style="display:flex;flex-direction:column;gap:10px;align-items:center;margin-top:6px;width:100%;max-width:260px">
+      <input id="hostName" placeholder="Your name" maxlength="24"
+        value="${me.display_name && me.display_name !== 'Guest' ? me.display_name : ''}">
       <input id="nightTitle" placeholder="e.g. Dave's Birthday" maxlength="60">
       <button id="createGo">Create</button>
       <button id="backToJoin" style="background:none;border:1px solid var(--line);color:var(--paper)">Back</button>
     </div>`;
   $('#createGo').onclick = async () => {
     $('#createGo').textContent = 'Creating…';
-    const { data, error } = await sb.rpc('create_night', { p_title: $('#nightTitle').value.trim() || null });
+    const { data, error } = await sb.rpc('create_night', {
+      p_title: $('#nightTitle').value.trim() || null,
+      p_display_name: $('#hostName').value.trim() || null
+    });
     if(error){ $('#ovSub').textContent = error.message; $('#createGo').textContent = 'Create'; return; }
     const row = Array.isArray(data) ? data[0] : data;
+    const { data: person } = await sb.from('person').select('*').eq('id', me.id).single();
+    if(person) me = person;
     showNightCreated(row.night_id, row.join_code);
   };
   $('#backToJoin').onclick = () => promptJoin(new URLSearchParams(location.search).get('code') || DEFAULT_CODE);
@@ -550,6 +556,7 @@ function subscribe(nightId){
     .on('postgres_changes', { event:'*', schema:'public', table:'allocation'    }, refresh)
     .on('postgres_changes', { event:'*', schema:'public', table:'night_member', filter:`night_id=eq.${nightId}` }, refresh)
     .on('postgres_changes', { event:'*', schema:'public', table:'night',        filter:`id=eq.${nightId}` }, refresh)
+    .on('postgres_changes', { event:'*', schema:'public', table:'stop',         filter:`night_id=eq.${nightId}` }, refresh)
     .subscribe(status => {
       const t = $('#liveTag');
       if(status === 'SUBSCRIBED'){
@@ -563,14 +570,16 @@ let refreshT;
 function refresh(){
   clearTimeout(refreshT);
   refreshT = setTimeout(async () => {
-    const [n, mem, exp, bal] = await Promise.all([
+    const [n, mem, st, exp, bal] = await Promise.all([
       sb.from('night').select('*').eq('id', night.id).single(),
       sb.from('night_member').select('*, person(*)').eq('night_id', night.id),
+      sb.from('stop').select('*').eq('night_id', night.id).order('seq'),
       sb.from('expense').select('*, allocation(*)').eq('night_id', night.id).order('occurred_at'),
       sb.from('night_balance').select('*').eq('night_id', night.id),
     ]);
     night    = n.data ?? night;
     members  = (mem.data || members).sort((a,b)=> new Date(a.joined_at) - new Date(b.joined_at));
+    stops    = st.data || stops;
     expenses = exp.data || expenses;
     balances = bal.data || balances;
     await refreshPlan();
@@ -660,7 +669,7 @@ function renderTonight(){
     toast(next === 'disputed' ? 'Flagged — held out of the tab' : 'Unflagged');
   });
   $('#pane-tonight').querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openEdit(b.dataset.edit));
-  const lc = $('#btnLastCall'); if(lc) lc.onclick = doLastCall;
+  const lc = $('#btnLastCall'); if(lc) lc.onclick = confirmLastCall;
 }
 
 function renderCrew(){
@@ -790,13 +799,26 @@ function renderTab(){
       <div class="r-stat"><span>Cheapest date</span><span>${extreme(-1)}</span></div>
       <div class="r-rule"></div>
       <div class="r-center r-muted">*** THAT'S LAST CALL, FOLKS ***</div>
-    </div>`;
+    </div>` +
+    (!isOpen() && isHost()
+      ? `<button class="lastcall" id="btnReopen" style="margin-top:14px;background:linear-gradient(135deg,var(--teal),#1d9e7a)">
+           Reopen this night<small>ADD MORE · RE-SETTLE LATER</small></button>`
+      : '');
 
   $('#pane-tab').querySelectorAll('[data-pay]').forEach(b => b.onclick = () => {
     settledLocal.add(+b.dataset.pay);
     toast('Marked received — we never move the money');
     renderTab();
   });
+
+  const rp = $('#btnReopen');
+  if(rp) rp.onclick = async () => {
+    const { error } = await sb.rpc('reopen_night', { p_night_id: night.id });
+    if(error) return toast(error.message, true);
+    settledLocal.clear();
+    toast('Reopened — back to logging rounds');
+    goTab('tonight');
+  };
 }
 function extreme(dir){
   const s = [...balances].sort((a,b)=> dir*(b.paid_cents - a.paid_cents))[0];
@@ -815,6 +837,17 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
 const goTab = n => document.querySelector(`nav button[data-tab="${n}"]`).click();
 
 /* ---------- last call ---------- */
+function confirmLastCall(){
+  overlay('Call it?', 'This closes the night, nets the ledger, and locks every expense in.');
+  $('#ovBody').innerHTML = `
+    <div style="display:flex;gap:10px;width:100%;max-width:260px;margin-top:6px">
+      <button id="lcCancel" style="flex:1;background:none;border:1px solid var(--line);color:var(--paper)">Not yet</button>
+      <button id="lcConfirm" style="flex:1;background:var(--magenta)">Last Call</button>
+    </div>`;
+  $('#lcCancel').onclick = hideOverlay;
+  $('#lcConfirm').onclick = doLastCall;
+}
+
 async function doLastCall(){
   overlay('Closing out','NETTING THE LEDGER…');
   const { error } = await sb.rpc('close_night', { p_night_id: night.id, p_dust_cents: DUST_CENTS });
@@ -831,7 +864,7 @@ const baseOf = () => draft.editing ? draft.base : parseInt(draft.digits || '0', 
 const tipOf  = () => {
   const b = baseOf();
   if(draft.editing) return draft.fixedTip;
-  return draft.tip === 'round' ? Math.ceil(b/500)*500 - b : Math.round(b * draft.tip / 100);
+  return Math.round(b * draft.tip / 100);
 };
 const wSum = () => draft.alloc.reduce((s,a)=>s+a.w, 0);
 
@@ -841,7 +874,7 @@ function eligible(kind, at){
 
 function openAdd(kind){
   const at = new Date();
-  draft = { editing:null, kind, payer: me.id, digits:'', tip: kind==='round'?18:0,
+  draft = { editing:null, kind, payer: me.id, digits:'', tip: 0,
             showShares:false, at, alloc: eligible(kind, at).map(p => ({p, w:1})) };
   $('#shTitle').textContent = kind === 'round' ? "Who's buying?" : 'Log an expense';
   $('#shHint').textContent  = kind === 'round'
@@ -866,6 +899,39 @@ function openEdit(id){
 function show(){ renderSheet(); $('#scrim').classList.add('on'); $('#sheet').classList.add('on'); }
 function close(){ $('#scrim').classList.remove('on'); $('#sheet').classList.remove('on'); }
 
+// Drag-to-dismiss. Only starts from the grab handle / title / hint —
+// not the interactive body — so it doesn't hijack typing or tapping
+// the keypad. Pulling past the threshold closes it; short of that,
+// it springs back.
+function makeSwipeToClose(sheetEl, closeFn){
+  const DISMISS_PX = 90;
+  let startY = null, dragging = false;
+
+  sheetEl.addEventListener('pointerdown', e => {
+    if(!e.target.closest('.grab, h2, .hint')) return;
+    startY = e.clientY;
+    dragging = true;
+    sheetEl.style.transition = 'none';
+  });
+  window.addEventListener('pointermove', e => {
+    if(!dragging) return;
+    const dy = e.clientY - startY;
+    if(dy > 0) sheetEl.style.transform = `translateY(${dy}px)`;
+  });
+  const release = e => {
+    if(!dragging) return;
+    dragging = false;
+    sheetEl.style.transition = '';
+    const dy = e.clientY - startY;
+    sheetEl.style.transform = '';
+    if(dy > DISMISS_PX) closeFn();
+  };
+  window.addEventListener('pointerup', release);
+  window.addEventListener('pointercancel', release);
+}
+makeSwipeToClose($('#sheet'), close);
+makeSwipeToClose($('#stopSheet'), closeStopSheet);
+
 function renderSheet(){
   const at = draft.at;
   $('#payerRow').innerHTML = members.map(m => `
@@ -882,7 +948,7 @@ function renderSheet(){
   $('#tipRow').style.display = draft.editing ? 'none' : 'flex';
   $('#tipRow').querySelectorAll('.chip').forEach(c => {
     c.classList.toggle('on', String(draft.tip) === c.dataset.tip);
-    c.onclick = () => { draft.tip = c.dataset.tip === 'round' ? 'round' : +c.dataset.tip; renderSheet(); };
+    c.onclick = () => { draft.tip = +c.dataset.tip; renderSheet(); };
   });
 
   const inSplit = id => draft.alloc.some(a => a.p === id);
