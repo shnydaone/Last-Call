@@ -426,6 +426,7 @@ function promptJoin(code){
       <input id="joinName" placeholder="Your name" maxlength="24">
       <button id="joinGo">Join</button>
       <button id="goStart" style="background:none;border:1px solid var(--line);color:var(--paper);margin-top:6px">Start a Night Out instead</button>
+      <button id="goSignIn" style="background:none;border:none;color:var(--dim2);font-size:11px;text-decoration:underline">Already hosted before? Sign in</button>
     </div>`;
   $('#joinGo').onclick = async () => {
     const c = $('#joinCode').value.trim();
@@ -443,46 +444,56 @@ function promptJoin(code){
     await load(data);
   };
   $('#goStart').onclick = () => promptStart();
+  $('#goSignIn').onclick = () => promptSignIn();
+}
+
+function promptSignIn(){
+  overlay('Sign in','Get back into an account you\'ve already linked an email to.');
+  $('#ovBody').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:10px;align-items:center;margin-top:6px;width:100%;max-width:260px">
+      <input id="signInEmail" type="email" placeholder="you@example.com">
+      <button id="sendSignIn">Send sign-in link</button>
+      <button id="backToJoin3" style="background:none;border:1px solid var(--line);color:var(--paper)">Back</button>
+    </div>`;
+  $('#sendSignIn').onclick = async () => {
+    const email = $('#signInEmail').value.trim();
+    if(!email) return;
+    $('#sendSignIn').textContent = 'Sending…';
+    const redirectTo = location.href.split('?')[0].split('#')[0];
+    // shouldCreateUser:false — this is for someone getting back into an
+    // account they already have, not creating a new one. If the email
+    // isn't registered yet, error out and point them at Start instead.
+    const { error } = await sb.auth.signInWithOtp({
+      email, options: { emailRedirectTo: redirectTo, shouldCreateUser: false }
+    });
+    if(error){
+      $('#ovSub').textContent = error.message.match(/signup|not allowed|not found/i)
+        ? 'No account found for that email — use "Start a Night Out" to create one.'
+        : error.message;
+      $('#sendSignIn').textContent = 'Send sign-in link';
+      return;
+    }
+    overlay('Check your email', `Sent a sign-in link to <code>${email}</code>.<br><br>Tap it — you'll land back here signed in, on any device.`);
+  };
+  $('#backToJoin3').onclick = () => promptJoin(new URLSearchParams(location.search).get('code') || DEFAULT_CODE);
 }
 
 function promptStart(){
-  if(me.is_permanent){
-    overlay('Start a Night Out','Give it a name — or skip and we\'ll date-stamp it.');
-    $('#ovBody').innerHTML = `
-      <div style="display:flex;flex-direction:column;gap:10px;align-items:center;margin-top:6px;width:100%;max-width:260px">
-        <input id="nightTitle" placeholder="e.g. Dave's Birthday" maxlength="60">
-        <button id="createGo">Create</button>
-        <button id="backToJoin" style="background:none;border:1px solid var(--line);color:var(--paper)">Back</button>
-      </div>`;
-    $('#createGo').onclick = async () => {
-      $('#createGo').textContent = 'Creating…';
-      const { data, error } = await sb.rpc('create_night', { p_title: $('#nightTitle').value.trim() || null });
-      if(error){ $('#ovSub').textContent = error.message; $('#createGo').textContent = 'Create'; return; }
-      const row = Array.isArray(data) ? data[0] : data;
-      showNightCreated(row.night_id, row.join_code);
-    };
-    $('#backToJoin').onclick = () => promptJoin(new URLSearchParams(location.search).get('code') || DEFAULT_CODE);
-    return;
-  }
-
-  // anonymous — needs a durable identity before they can own a night
-  overlay('One thing first','Hosting needs an email — so the night (and what people owe you) survives more than this browser tab.');
+  overlay('Start a Night Out','Give it a name — or skip and we\'ll date-stamp it.');
   $('#ovBody').innerHTML = `
     <div style="display:flex;flex-direction:column;gap:10px;align-items:center;margin-top:6px;width:100%;max-width:260px">
-      <input id="hostEmail" type="email" placeholder="you@example.com">
-      <button id="sendLink">Send verification link</button>
-      <button id="backToJoin2" style="background:none;border:1px solid var(--line);color:var(--paper)">Back</button>
+      <input id="nightTitle" placeholder="e.g. Dave's Birthday" maxlength="60">
+      <button id="createGo">Create</button>
+      <button id="backToJoin" style="background:none;border:1px solid var(--line);color:var(--paper)">Back</button>
     </div>`;
-  $('#sendLink').onclick = async () => {
-    const email = $('#hostEmail').value.trim();
-    if(!email) return;
-    $('#sendLink').textContent = 'Sending…';
-    const redirectTo = location.href.split('?')[0].split('#')[0];
-    const { error } = await sb.auth.updateUser({ email }, { emailRedirectTo: redirectTo });
-    if(error){ $('#ovSub').textContent = error.message; $('#sendLink').textContent = 'Send verification link'; return; }
-    overlay('Check your email', `Sent a link to <code>${email}</code>.<br><br>Tap it — you'll land right back here, already good to go.`);
+  $('#createGo').onclick = async () => {
+    $('#createGo').textContent = 'Creating…';
+    const { data, error } = await sb.rpc('create_night', { p_title: $('#nightTitle').value.trim() || null });
+    if(error){ $('#ovSub').textContent = error.message; $('#createGo').textContent = 'Create'; return; }
+    const row = Array.isArray(data) ? data[0] : data;
+    showNightCreated(row.night_id, row.join_code);
   };
-  $('#backToJoin2').onclick = () => promptJoin(new URLSearchParams(location.search).get('code') || DEFAULT_CODE);
+  $('#backToJoin').onclick = () => promptJoin(new URLSearchParams(location.search).get('code') || DEFAULT_CODE);
 }
 
 function showNightCreated(nightId, code){
@@ -531,8 +542,10 @@ async function refreshPlan(){
 }
 
 /* live sync — any write by anyone reloads the affected slices */
+let currentChannel = null;
 function subscribe(nightId){
-  sb.channel('night:' + nightId)
+  if(currentChannel) sb.removeChannel(currentChannel);
+  currentChannel = sb.channel('night:' + nightId)
     .on('postgres_changes', { event:'*', schema:'public', table:'expense',      filter:`night_id=eq.${nightId}` }, refresh)
     .on('postgres_changes', { event:'*', schema:'public', table:'allocation'    }, refresh)
     .on('postgres_changes', { event:'*', schema:'public', table:'night_member', filter:`night_id=eq.${nightId}` }, refresh)
@@ -655,11 +668,16 @@ function renderCrew(){
   const t0 = members.length ? new Date(members[0].joined_at) : now;
   const span = Math.max(now - t0, 1);
 
+  const canLeave = !isHost() || !isOpen();
   $('#pane-crew').innerHTML =
     `<div class="note-box"><b style="color:var(--paper)">Presence drives the split.</b><br>
       Tap someone out when they leave and every expense logged after that skips them automatically.
       ${isHost() ? `<br><br>Join code: <span class="code-chip">${night.join_code}</span>` : ''}
-      <br><br><button class="link" id="btnSwitchNight" style="padding:0">Not this night? Switch</button></div>` +
+      <br><br><button class="link" id="btnSwitchNight" style="padding:0">Not this night? Switch</button>
+      <br>${canLeave
+        ? `<button class="link" id="btnLeaveNight" style="padding:0;color:var(--magenta)">Leave this night entirely</button>`
+        : `<span style="font-size:10px;color:var(--dim2);letter-spacing:.08em;text-transform:uppercase">Close the night to leave as host</span>`}
+    </div>` +
     `<div class="section-lbl">Who was out</div>` +
     members.map(m => {
       const b = balances.find(x => x.person_id === m.person_id) ?? {paid_cents:0,owed_cents:0,net_cents:0};
@@ -712,6 +730,15 @@ function renderCrew(){
     // Whichever one you enter next becomes the resume target on reload,
     // since boot() picks the most recently joined membership.
     promptJoin(new URLSearchParams(location.search).get('code') || DEFAULT_CODE);
+  };
+
+  const lv = $('#btnLeaveNight');
+  if(lv) lv.onclick = async () => {
+    const { error } = await sb.rpc('leave_night', { p_night_id: night.id });
+    if(error) return toast(error.message, true);
+    if(currentChannel){ sb.removeChannel(currentChannel); currentChannel = null; }
+    night = null; members = []; stops = []; expenses = []; balances = []; plan = [];
+    promptJoin(DEFAULT_CODE);
   };
 }
 
