@@ -6,13 +6,24 @@
 <title>Last Call</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
 <style>
 :root{
   --ink:#14101F; --ink2:#1D1730; --ink3:#2A2142; --line:#372C52;
   --amber:#E8A33D; --amber-hot:#FFC061; --magenta:#FF4D8D;
   --teal:#3DD9B0; --violet:#8B7BFF; --paper:#F5EFE6;
-  --dim:#9C92AE; --dim2:#6E6484;
+  /* Text hierarchy — 3 tiers. dim2 was #6E6484 (2.7–3.4:1, fails WCAG AA's
+     4.5:1 for normal text at every size it's used). Raised to clear AA
+     against every card background in use (ink/ink2/ink3), while staying
+     visually distinct from --dim via size/case/tracking, not just lightness. */
+  --dim:#9C92AE;   /* secondary — supporting text, instructions: 5.1–6.4:1 */
+  --dim2:#9088A8;  /* muted metadata — times, small status: 4.5–5.6:1 (was 2.7–3.4:1) */
+  /* Standardized radius scale — was 13 distinct values (2–32px) from
+     iterative one-off edits. Existing components keep their exact radius
+     where changing it would alter established shape (pills, the receipt's
+     clip-path); this scale is for anything genuinely inconsistent. */
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:999px;
+  --tap-min:44px; /* minimum height for primary tappable controls */
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
@@ -31,20 +42,28 @@ header{padding:20px 20px 14px;border-bottom:1px solid var(--line);
 .live{color:var(--magenta);display:flex;align-items:center;gap:5px}
 .live.closed{color:var(--dim2)}
 .live.offline{color:var(--dim2)}
-.dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 2s infinite}
+.dot{width:5px;height:5px;border-radius:50%;background:currentColor;animation:pulse 2.4s ease-in-out infinite}
 .live.closed .dot{animation:none}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 h1{font-family:'Anton',sans-serif;font-size:34px;letter-spacing:.02em;line-height:1;margin:8px 0 12px;text-transform:uppercase}
-.totals{display:flex;gap:20px;align-items:baseline}
-.tot-big{font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;color:var(--amber)}
+.totals{display:flex;align-items:baseline}
+.tot-block{padding:0 16px}
+.tot-block:first-child{padding-left:0}
+.tot-block+.tot-block{border-left:1px solid var(--line)}
+.tot-big{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;color:var(--amber);
+  white-space:nowrap}
 .tot-lbl{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim2)}
-.tot-sub{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--dim)}
+.tot-sub{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--dim);white-space:nowrap}
 
-nav{display:flex;border-bottom:1px solid var(--line);flex-shrink:0}
-nav button{flex:1;background:none;border:none;cursor:pointer;padding:13px 0;
-  font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
-  color:var(--dim2);border-bottom:2px solid transparent;transition:.18s}
-nav button[aria-selected="true"]{color:var(--amber);border-bottom-color:var(--amber)}
+nav{display:flex;border-bottom:1px solid var(--line);flex-shrink:0;background:var(--ink)}
+nav button{flex:1;position:relative;background:none;border:none;cursor:pointer;
+  min-height:var(--tap-min);padding:0 4px;display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--dim2);transition:color .18s}
+nav button::after{content:'';position:absolute;left:50%;bottom:-1px;transform:translateX(-50%);
+  width:26px;height:2px;border-radius:2px 2px 0 0;background:transparent;transition:background .18s}
+nav button[aria-selected="true"]{color:var(--amber-hot)}
+nav button[aria-selected="true"]::after{background:var(--amber)}
 
 main{flex:1;overflow-y:auto;overscroll-behavior:contain}
 main::-webkit-scrollbar{width:0}
@@ -55,24 +74,53 @@ main::-webkit-scrollbar{width:0}
 .stop-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
 .stop-idx{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink);background:var(--amber);
   width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-weight:600;flex-shrink:0}
-.stop-name{font-family:'Anton',sans-serif;font-size:17px;letter-spacing:.02em;text-transform:uppercase}
-.stop-time{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim2);margin-left:auto}
+.stop-name{flex:1;font-family:'Anton',sans-serif;font-size:17px;letter-spacing:.02em;text-transform:uppercase;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stop-time{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim2);margin-left:auto;white-space:nowrap;flex-shrink:0}
 
-.exp{background:var(--ink2);border:1px solid var(--ink3);border-radius:12px;padding:12px 13px;
-  margin-bottom:8px;display:flex;gap:11px;align-items:center;cursor:pointer;
+.exp{background:var(--ink2);border:1px solid var(--ink3);border-radius:var(--r-md);padding:12px 13px;
+  margin-bottom:8px;display:flex;gap:10px;align-items:center;
   animation:slidein .3s ease both;transition:border-color .15s}
-.exp:hover{border-color:var(--line)}
+/* Only tappable (and only looks tappable) when there's actually somewhere
+   to go — openEdit() itself refuses once the night is closed, so the
+   affordance here mirrors that instead of promising an edit that won't
+   happen. data-edit is the single source of truth for both. */
+.exp[data-edit]{cursor:pointer}
+.exp[data-edit]:hover{border-color:var(--line)}
 @keyframes slidein{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .av{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;flex-shrink:0;
   font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;color:var(--ink)}
 .exp-mid{flex:1;min-width:0}
-.exp-note{font-size:13px;font-weight:600;line-height:1.3}
-.exp-meta{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim2);margin-top:3px}
-.exp-amt{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;text-align:right}
-.exp-split{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--dim2);text-align:right;margin-top:2px}
-.flag{background:none;border:none;cursor:pointer;color:var(--dim2);font-size:14px;padding:2px 4px}
+.exp-head{display:flex;align-items:center;gap:6px}
+.exp-note{font-size:13px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;line-height:1.3}
+.exp-flagtag{font-family:'IBM Plex Mono',monospace;font-size:8.5px;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--magenta);border:1px solid rgba(255,77,141,.4);
+  border-radius:4px;padding:1px 5px;flex-shrink:0}
+/* Tier 2 — who paid + plain-English participant count. "N-way"/"shares"
+   jargon moved out of the primary line entirely (see exp-sub for the
+   uneven-split qualifier, kept minimal). */
+.exp-meta{font-size:12px;color:var(--dim);margin-top:3px;line-height:1.3}
+/* Tier 3 — secondary metadata: time, stop, tip. Smallest, dimmest. */
+.exp-sub{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim2);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.exp-amt-col{flex-shrink:0;text-align:right}
+.exp-amt{font-family:'IBM Plex Mono',monospace;font-size:19px;font-weight:700;color:var(--paper);
+  white-space:nowrap}
+.exp-chev{color:var(--dim2);font-size:16px;flex-shrink:0}
+
+.flag{background:none;border:none;cursor:pointer;color:var(--dim2);padding:3px 2px;
+  display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;min-width:30px}
+.flag-ico{font-size:13px;line-height:1}
+.flag-lbl{font-family:'IBM Plex Mono',monospace;font-size:7.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
 .flag:hover,.flag.on{color:var(--magenta)}
 .exp.disputed{border-color:rgba(255,77,141,.45);background:rgba(255,77,141,.06)}
+
+.empty-tonight{text-align:center;padding:56px 22px 36px}
+.empty-tonight .empty-title{font-family:'Anton',sans-serif;font-size:19px;letter-spacing:.03em;
+  text-transform:uppercase;color:var(--paper)}
+.empty-tonight .empty-sub{font-size:13px;color:var(--dim);line-height:1.6;margin:9px auto 20px;max-width:230px}
+.empty-tonight .empty-cta{border:none;border-radius:var(--r-lg);padding:14px 22px;min-height:var(--tap-min);
+  cursor:pointer;background:var(--amber);color:var(--ink);font-family:'Anton',sans-serif;
+  font-size:14px;letter-spacing:.05em;text-transform:uppercase}
 
 .tapline{display:flex;align-items:center;gap:8px;padding:7px 0 15px;
   font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim2)}
@@ -92,8 +140,8 @@ main::-webkit-scrollbar{width:0}
 .prow:last-child{border:none}
 .ptop{display:flex;align-items:center;gap:12px}
 .pname{flex:1;font-size:14px;font-weight:600}
-.ptag{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;
-  border-radius:4px;padding:2px 5px;margin-left:6px}
+.ptag{font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
+  border-radius:var(--r-sm);padding:2px 6px;margin-left:6px}
 .tag-dry{color:var(--teal);border:1px solid rgba(61,217,176,.4)}
 .tag-gone{color:var(--magenta);border:1px solid rgba(255,77,141,.4)}
 .tag-host{color:var(--amber);border:1px solid rgba(232,163,61,.4)}
@@ -104,15 +152,15 @@ main::-webkit-scrollbar{width:0}
 .track .span{position:absolute;top:0;bottom:0;border-radius:3px;opacity:.85}
 .pmeta{display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--dim2)}
 .pbtns{display:flex;gap:6px;margin-top:9px}
-.mini-btn{background:none;border:1px solid var(--line);color:var(--dim2);border-radius:6px;
-  font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.07em;padding:6px 9px;
+.mini-btn{background:none;border:1px solid var(--line);color:var(--dim2);border-radius:var(--r-sm);
+  font-size:11px;font-weight:600;letter-spacing:.02em;padding:7px 10px;
   cursor:pointer;transition:.15s;text-transform:uppercase}
 .mini-btn.on{border-color:var(--teal);color:var(--teal);background:rgba(61,217,176,.1)}
 .mini-btn.warn.on{border-color:var(--magenta);color:var(--magenta);background:rgba(255,77,141,.1)}
 
 .section-lbl{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;
   text-transform:uppercase;color:var(--dim2);margin:6px 0 6px}
-.note-box{background:var(--ink2);border:1px solid var(--ink3);border-radius:10px;padding:11px 12px;
+.note-box{background:var(--ink2);border:1px solid var(--ink3);border-radius:var(--r-md);padding:13px;
   font-size:11.5px;line-height:1.55;color:var(--dim);margin-bottom:16px}
 .code-chip{font-family:'IBM Plex Mono',monospace;background:var(--ink3);border:1px solid var(--line);
   border-radius:6px;padding:3px 8px;color:var(--amber-hot);letter-spacing:.14em;font-size:12px}
@@ -133,24 +181,34 @@ main::-webkit-scrollbar{width:0}
 .r-big{font-family:'Anton',sans-serif;font-size:15px;letter-spacing:.03em}
 .r-stat{display:flex;justify-content:space-between;font-size:10.5px;opacity:.75}
 .r-dust{font-size:10.5px;opacity:.7;font-style:italic;padding:6px 0 2px}
-.venmo{display:block;width:100%;margin-top:9px;background:#1A1520;color:var(--paper);border:none;
-  border-radius:6px;padding:9px;cursor:pointer;font-family:'IBM Plex Mono',monospace;
-  font-size:10px;letter-spacing:.12em;text-transform:uppercase;text-align:center;text-decoration:none}
+.venmo{width:100%;margin-top:9px;background:#1A1520;color:var(--paper);border:none;
+  border-radius:var(--r-sm);padding:9px;min-height:var(--tap-min);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:13px;font-weight:600;letter-spacing:.02em;text-align:center;text-decoration:none}
 .settled{opacity:.4}
 .preview-tag{background:rgba(232,163,61,.14);border:1px solid rgba(232,163,61,.45);color:var(--amber-hot);
-  border-radius:8px;padding:9px 11px;margin-bottom:14px;font-family:'IBM Plex Mono',monospace;
-  font-size:10px;letter-spacing:.06em;line-height:1.5}
+  border-radius:var(--r-sm);padding:9px 11px;margin-bottom:14px;
+  font-size:12px;font-weight:600;line-height:1.5}
 
-.fab{position:absolute;left:20px;right:20px;bottom:20px;z-index:20;display:flex;gap:10px}
-.fab button{flex:1;border:none;cursor:pointer;border-radius:14px;padding:15px 0;
-  font-family:'Anton',sans-serif;font-size:15px;letter-spacing:.06em;text-transform:uppercase;transition:transform .12s}
+.fab{position:absolute;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));
+  z-index:20;display:flex;gap:8px;align-items:stretch}
+.fab button{border:none;cursor:pointer;border-radius:var(--r-lg);min-height:56px;padding:6px 8px;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  font-family:'Anton',sans-serif;letter-spacing:.04em;text-transform:uppercase;line-height:1.15;
+  transition:transform .12s,opacity .12s}
 .fab button:active{transform:scale(.97)}
-.fab-main{background:var(--amber);color:var(--ink);box-shadow:0 8px 24px -6px rgba(232,163,61,.5)}
-.fab-alt{flex:0 0 62px !important;background:var(--ink2);color:var(--paper);border:1px solid var(--line) !important}
-.fab-last{flex:0 0 70px !important;background:linear-gradient(135deg,var(--magenta),#D6336C);
-  color:#fff;font-family:'Anton',sans-serif;font-size:11px;line-height:1.2;letter-spacing:.03em;
-  text-transform:uppercase;border:none !important}
-.fab-last:disabled{background:var(--ink3) !important;color:var(--dim2)}
+.fab button:disabled{cursor:not-allowed}
+/* Primary — largest, easiest reach, most visual weight */
+.fab-main{flex:1.6;font-size:15px;background:var(--amber);color:var(--ink);
+  box-shadow:0 8px 24px -6px rgba(232,163,61,.5)}
+/* Secondary — labeled, not icon-only; quieter neutral fill */
+.fab-alt{flex:1;font-size:12px;background:var(--ink2);color:var(--paper);border:1px solid var(--line)}
+.fab-alt .ico{font-size:14px;line-height:1}
+/* Destructive/final — distinct (magenta = the app's existing warning color)
+   but outlined rather than solid-filled, so it reads as deliberate and
+   final without out-competing the solid-fill primary action for attention. */
+.fab-last{flex:1;font-size:12px;background:transparent;color:var(--magenta);
+  border:1.5px solid var(--magenta)}
+.fab-last:disabled{border-color:var(--ink3);color:var(--dim2)}
 
 .scrim{position:absolute;inset:0;background:rgba(6,4,12,.75);backdrop-filter:blur(3px);z-index:30;display:none}
 .scrim.on{display:block;animation:fade .2s both}
@@ -168,10 +226,10 @@ main::-webkit-scrollbar{width:0}
   text-align:center;color:var(--amber);padding:6px 0 4px}
 .tip-row{display:flex;gap:6px;justify-content:center;margin-bottom:14px;flex-wrap:wrap}
 .chip{background:var(--ink3);border:1px solid transparent;color:var(--dim);cursor:pointer;
-  border-radius:20px;padding:6px 11px;font-family:'IBM Plex Mono',monospace;font-size:10px;transition:.15s}
+  border-radius:var(--r-full);padding:8px 13px;font-size:12px;font-weight:600;transition:.15s}
 .chip.on{background:rgba(232,163,61,.16);border-color:var(--amber);color:var(--amber-hot)}
 .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
-.pad button{background:var(--ink3);border:none;color:var(--paper);border-radius:12px;padding:16px 0;
+.pad button{background:var(--ink3);border:none;color:var(--paper);border-radius:var(--r-md);padding:16px 0;
   font-family:'IBM Plex Mono',monospace;font-size:23px;cursor:pointer}
 .pad button:active{background:var(--line)}
 
@@ -185,11 +243,11 @@ main::-webkit-scrollbar{width:0}
   font-family:'IBM Plex Mono',monospace;font-size:8px;font-weight:600;color:var(--ink);opacity:.35}
 .who button.on .mini{opacity:1}
 .who-actions{display:flex;gap:10px;margin-bottom:8px;flex-wrap:wrap}
-.link{background:none;border:none;color:var(--amber);cursor:pointer;font-family:'IBM Plex Mono',monospace;
-  font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:4px 0}
-.auto-note{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--dim2);line-height:1.5;margin-bottom:14px}
+.link{background:none;border:none;color:var(--amber);cursor:pointer;
+  font-size:13px;font-weight:600;letter-spacing:.01em;padding:4px 0}
+.auto-note{font-size:12px;color:var(--dim2);line-height:1.5;margin-bottom:14px}
 
-.shares{background:var(--ink);border:1px solid var(--ink3);border-radius:10px;padding:10px 12px;margin-bottom:14px}
+.shares{background:var(--ink);border:1px solid var(--ink3);border-radius:var(--r-md);padding:13px;margin-bottom:14px}
 .shrow{display:flex;align-items:center;gap:10px;padding:6px 0}
 .shrow .nm{flex:1;font-size:12px;font-weight:600}
 .stepper{display:flex;align-items:center;gap:8px}
@@ -198,33 +256,87 @@ main::-webkit-scrollbar{width:0}
 .stepper span{font-family:'IBM Plex Mono',monospace;font-size:12px;width:30px;text-align:center;color:var(--amber)}
 .shrow .amt{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dim2);width:52px;text-align:right}
 
-.confirm{width:100%;border:none;border-radius:14px;padding:16px;cursor:pointer;background:var(--amber);
+.confirm{width:100%;border:none;border-radius:var(--r-lg);padding:16px;min-height:var(--tap-min);cursor:pointer;background:var(--amber);
   color:var(--ink);font-family:'Anton',sans-serif;font-size:16px;letter-spacing:.06em;text-transform:uppercase}
 .confirm:disabled{background:var(--ink3);color:var(--dim2);cursor:not-allowed}
 .danger{width:100%;background:none;border:1px solid rgba(255,77,141,.4);color:var(--magenta);
-  border-radius:12px;padding:12px;cursor:pointer;margin-top:9px;
-  font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase}
-.cancel{width:100%;background:none;border:none;color:var(--dim2);cursor:pointer;padding:12px;
-  font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+  border-radius:var(--r-md);padding:12px;min-height:var(--tap-min);cursor:pointer;margin-top:9px;
+  font-size:13px;font-weight:600}
+.cancel{width:100%;background:none;border:none;color:var(--dim2);cursor:pointer;padding:12px;min-height:var(--tap-min);
+  font-size:13px;font-weight:600}
 
-.toast{position:absolute;left:20px;right:20px;bottom:96px;z-index:50;background:var(--teal);color:var(--ink);
+/* Last Call confirmation sheet */
+.lc-summary{background:var(--ink);border:1px solid var(--ink3);border-radius:var(--r-md);
+  padding:4px 14px;margin-bottom:16px}
+.lc-row{display:flex;justify-content:space-between;gap:10px;padding:10px 0;font-size:12.5px;
+  color:var(--dim);border-bottom:1px solid var(--ink3)}
+.lc-row:last-child{border-bottom:none}
+.lc-row b{color:var(--paper);font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:13px}
+.keep-btn{width:100%;background:none;border:1px solid var(--line);color:var(--paper);
+  border-radius:var(--r-lg);padding:14px;min-height:var(--tap-min);cursor:pointer;
+  font-family:'Anton',sans-serif;font-size:14px;letter-spacing:.05em;text-transform:uppercase}
+.end-btn{width:100%;border:none;border-radius:var(--r-lg);padding:15px;min-height:var(--tap-min);
+  cursor:pointer;margin-top:9px;background:linear-gradient(135deg,var(--magenta),#D6336C);color:#fff;
+  font-family:'Anton',sans-serif;font-size:14px;letter-spacing:.05em;text-transform:uppercase;
+  box-shadow:0 8px 22px -8px rgba(255,77,141,.45)}
+
+.toast{position:absolute;left:20px;right:20px;bottom:calc(96px + env(safe-area-inset-bottom));z-index:70;background:var(--teal);color:var(--ink);
   border-radius:11px;padding:11px 14px;font-size:12px;font-weight:600;opacity:0;transform:translateY(10px);
-  transition:.25s;pointer-events:none;z-index:70}
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  transition:.25s;pointer-events:none}
 .toast.on{opacity:1;transform:none}
 .toast.err{background:var(--magenta);color:#fff}
+.toast.actionable{pointer-events:auto}
+.toast-action{background:rgba(0,0,0,.16);border:none;color:inherit;border-radius:7px;
+  padding:6px 10px;min-height:32px;font-size:11px;font-weight:700;letter-spacing:.03em;
+  text-transform:uppercase;cursor:pointer;flex-shrink:0}
 
 .overlay{position:absolute;inset:0;z-index:60;background:var(--ink);display:none;
-  flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:32px;text-align:center}
+  flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px;text-align:center;
+  overflow-y:auto} /* was clipped by .phone's overflow:hidden once content+keyboard exceeded the viewport */
 .overlay.on{display:flex;animation:fade .25s both}
 .overlay .big{font-family:'Anton',sans-serif;font-size:26px;letter-spacing:.06em;text-transform:uppercase;color:var(--amber)}
-.overlay .sub{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dim2);letter-spacing:.08em;line-height:1.8}
+.overlay .sub{font-size:14px;line-height:1.55;color:var(--dim);max-width:280px}
 .overlay code{background:var(--ink2);border:1px solid var(--line);border-radius:6px;padding:2px 6px;
   color:var(--amber-hot);font-size:10.5px}
+.field-label{width:100%;max-width:260px;text-align:left;font-size:12px;font-weight:600;color:var(--dim);
+  margin:8px 0 -6px 2px}
 .overlay input{width:100%;max-width:260px;background:var(--ink2);border:1px solid var(--line);
-  border-radius:10px;padding:13px;color:var(--paper);font-family:'IBM Plex Mono',monospace;
-  font-size:16px;text-align:center;letter-spacing:.1em}
-.overlay button{background:var(--amber);color:var(--ink);border:none;border-radius:12px;padding:14px 26px;
-  cursor:pointer;font-family:'Anton',sans-serif;font-size:15px;letter-spacing:.06em;text-transform:uppercase}
+  border-radius:var(--r-md);padding:13px;color:var(--paper);min-height:var(--tap-min);
+  font-size:16px;transition:border-color .15s}
+.overlay input.code-field{font-family:'IBM Plex Mono',monospace;text-align:center;letter-spacing:.3em;font-weight:600}
+.overlay input::placeholder{color:var(--dim2)}
+.overlay input:focus{outline:none;border-color:var(--amber)}
+.overlay input.input-error{border-color:var(--magenta)}
+.field-error{width:100%;max-width:260px;text-align:left;font-size:12px;color:var(--magenta);margin:-4px 0 0 2px}
+.overlay button{background:var(--amber);color:var(--ink);border:none;border-radius:var(--r-md);
+  width:100%;max-width:260px;padding:14px 26px;min-height:var(--tap-min);
+  cursor:pointer;font-family:'Anton',sans-serif;font-size:15px;letter-spacing:.06em;text-transform:uppercase;
+  transition:opacity .15s}
+.overlay button.secondary{background:none;border:1px solid var(--line);color:var(--paper)}
+.overlay button.copied{background:var(--teal);color:var(--ink)}
+.overlay button:disabled{opacity:.55;cursor:not-allowed}
+.overlay .divider{width:100%;max-width:260px;display:flex;align-items:center;gap:10px;margin:2px 0;
+  font-size:11px;color:var(--dim2);letter-spacing:.04em}
+.overlay .divider .bar{flex:1;height:1px;background:var(--line)}
+.code-display{font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;letter-spacing:.12em;
+  background:var(--ink3);border:1px solid var(--line);border-radius:var(--r-md);padding:14px 22px;color:var(--amber-hot)}
+
+/* Brand block — logo mark + wordmark + tagline. Lives only on the
+   join/start landing overlay (the one true "hero" moment); every other
+   screen keeps the plain Anton .big title so the mark doesn't get diluted
+   by repetition. Explicit text-transform:none on .brand-tag because it
+   sits inside .overlay .big, which sets uppercase for the plain-title case. */
+.brand{display:flex;align-items:center;gap:14px;margin-bottom:2px}
+.lc-mark{width:50px;height:50px;flex-shrink:0}
+.brand-word{font-family:'Playfair Display',serif;font-weight:900;font-size:28px;
+  letter-spacing:.01em;color:var(--paper);line-height:1;text-transform:uppercase}
+.brand-tag{font-family:'Archivo',sans-serif;font-size:12px;font-weight:500;color:var(--dim);
+  text-transform:none;letter-spacing:.01em;margin-top:5px}
+
+.qr-wrap{background:var(--paper);border-radius:var(--r-md);padding:12px;
+  display:inline-flex;align-self:center}
+.qr-wrap canvas{display:block;width:150px;height:150px}
 
 @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
 </style>
@@ -238,9 +350,9 @@ main::-webkit-scrollbar{width:0}
     </div>
     <h1>Last Call</h1>
     <div class="totals">
-      <div><div class="tot-lbl">Night total</div><div class="tot-big" id="hdrTotal">$0</div></div>
-      <div><div class="tot-lbl">Your tab</div><div class="tot-sub" id="hdrYou">$0</div></div>
-      <div><div class="tot-lbl">Out</div><div class="tot-sub" id="hdrOut">0</div></div>
+      <div class="tot-block"><div class="tot-lbl">Night total</div><div class="tot-big" id="hdrTotal">$0.00</div></div>
+      <div class="tot-block"><div class="tot-lbl">Your tab</div><div class="tot-sub" id="hdrYou">$0.00</div></div>
+      <div class="tot-block"><div class="tot-lbl">Active</div><div class="tot-sub" id="hdrOut">0 / 0</div></div>
     </div>
   </header>
 
@@ -257,9 +369,9 @@ main::-webkit-scrollbar{width:0}
   </main>
 
   <div class="fab" id="fab" style="display:none">
-    <button class="fab-main" id="btnRound">+ Round</button>
-    <button class="fab-last" id="btnLastCallFab">Last<br>Call</button>
-    <button class="fab-alt" id="btnStop" title="We moved">📍</button>
+    <button class="fab-main" id="btnRound">+ Add Round</button>
+    <button class="fab-alt" id="btnStop"><span class="ico" aria-hidden="true">📍</span>Add Stop</button>
+    <button class="fab-last" id="btnLastCallFab">Last Call</button>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -310,6 +422,17 @@ main::-webkit-scrollbar{width:0}
     <button class="cancel" id="stopCancel">Cancel</button>
   </div>
 
+  <div class="sheet" id="lastCallSheet" style="padding:20px 20px 22px">
+    <div class="sheet-handle">
+      <div class="grab"></div>
+      <h2>Last Call?</h2>
+      <p class="hint">This closes the night and prepares the final tab.</p>
+    </div>
+    <div class="lc-summary" id="lcSummary"></div>
+    <button class="keep-btn" id="lcKeepBtn">Keep Night Open</button>
+    <button class="end-btn" id="lcEndBtn">End Night</button>
+  </div>
+
   <div class="overlay" id="overlay">
     <div class="big" id="ovTitle">Connecting</div>
     <div class="sub" id="ovSub">Signing you in…</div>
@@ -319,6 +442,7 @@ main::-webkit-scrollbar{width:0}
 
 <script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import QRCode from 'https://esm.sh/qrcode@1.5.3';
 
 /* ============================================================
    CONFIG
@@ -346,6 +470,59 @@ const money  = c => '$' + (c/100).toFixed(2);
 const money0 = c => '$' + Math.round(c/100).toLocaleString();
 const clock  = ts => new Date(ts).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
 const initials = n => (n||'?').slice(0,2).toUpperCase();
+
+// Display-only grouping — "LASTCALL" → "LAST CALL". Purely cosmetic:
+// the actual night.join_code, the input's submitted value, and the
+// server-side match are all untouched. Never feed this back into a form.
+const groupCode = code => (code || '').replace(/(.{4})(?=.)/g, '$1 ');
+
+// Web Share API first (native share sheet — Messages, WhatsApp, etc. on
+// both iOS and Android), falling back to the existing sms: deep link
+// where Share isn't available (most desktop browsers).
+async function shareInvite(code, title){
+  const url = `${location.origin}${location.pathname}?code=${code}`;
+  const text = `Join "${title}" on Last Call — code ${code}`;
+  if(navigator.share){
+    try{ await navigator.share({ title: 'Last Call', text, url }); return 'shared'; }
+    catch(e){ if(e.name === 'AbortError') return 'cancelled'; }
+  }
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  location.href = (isIOS ? 'sms:&body=' : 'sms:?body=') + encodeURIComponent(`${text}\n${url}`);
+  return 'sms-fallback';
+}
+
+// Logo mark — circular arrows (the "session recirculates" motif) around an
+// L/C monogram. Inline SVG rather than an asset file, so it inherits the
+// palette without an extra request and never asks for image handoff.
+// Hex values hardcoded rather than var(--...) — presentation attributes on
+// <stop>/<text> don't reliably resolve custom properties across browsers
+// when the SVG is injected as an innerHTML string.
+const LC_MARK = `<svg viewBox="0 0 100 100" class="lc-mark" aria-hidden="true">
+  <defs>
+    <linearGradient id="lcGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E8A33D"/>
+      <stop offset="100%" stop-color="#FFC061"/>
+    </linearGradient>
+    <marker id="lcArrow" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto-start-reverse">
+      <path d="M0,0 L7,3.5 L0,7 Z" fill="#FFC061"/>
+    </marker>
+  </defs>
+  <path d="M50,9 A41,41 0 0 1 89,50" fill="none" stroke="url(#lcGrad)" stroke-width="5" stroke-linecap="round" marker-end="url(#lcArrow)"/>
+  <path d="M50,91 A41,41 0 0 1 11,50" fill="none" stroke="url(#lcGrad)" stroke-width="5" stroke-linecap="round" marker-end="url(#lcArrow)"/>
+  <line x1="80" y1="20" x2="20" y2="80" stroke="#F5EFE6" stroke-width="3"/>
+  <text x="25" y="46" font-family="Georgia, 'Playfair Display', serif" font-weight="700" font-size="32" fill="#F5EFE6">L</text>
+  <text x="46" y="79" font-family="Georgia, 'Playfair Display', serif" font-weight="700" font-size="32" fill="#F5EFE6">C</text>
+</svg>`;
+
+const brandBlock = () => `
+  <div class="brand">
+    ${LC_MARK}
+    <div>
+      <div class="brand-word">Last Call</div>
+      <div class="brand-tag">One night out&nbsp; · &nbsp;Zero confusion.</div>
+    </div>
+  </div>`;
+
 const PALETTE = ['#E8A33D','#FF4D8D','#3DD9B0','#8B7BFF','#FF8A5B','#6D9EEB','#F2C960'];
 const colorFor = id => PALETTE[[...id].reduce((a,c)=>a+c.charCodeAt(0),0) % PALETTE.length];
 
@@ -427,25 +604,60 @@ async function boot(){
 }
 
 function promptJoin(code){
-  overlay('Last Call','Join a night, or start your own.');
+  overlay('', 'Join a night already in progress.');
+  $('#ovTitle').innerHTML = brandBlock();
   $('#ovBody').innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:10px;align-items:center;margin-top:6px;width:100%;max-width:260px">
-      <input id="joinCode" value="${code}" placeholder="CODE" maxlength="12">
-      <input id="joinName" placeholder="Your name" maxlength="24">
-      <button id="joinGo">Join</button>
-      <button id="goStart" style="background:none;border:1px solid var(--line);color:var(--paper);margin-top:6px">Start a Night Out instead</button>
-      <button id="goSignIn" style="background:none;border:none;color:var(--dim2);font-size:11px;text-decoration:underline">Already hosted before? Sign in</button>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px;width:100%">
+      <div class="field-label">Invite code</div>
+      <input id="joinCode" class="code-field" value="${code}" placeholder="e.g. LASTCALL" maxlength="12" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false">
+      <div class="field-label">Your name</div>
+      <input id="joinName" placeholder="e.g. Sam" maxlength="24" autocomplete="name">
+      <div class="field-error" id="joinErr" style="display:none"></div>
+      <button id="joinGo" style="margin-top:4px">Join Night</button>
+
+      <div class="divider" style="margin-top:10px"><span class="bar"></span>or<span class="bar"></span></div>
+
+      <div style="font-size:13px;color:var(--dim);margin-top:2px">Hosting tonight?</div>
+      <button class="secondary" id="goStart">Start a Night</button>
+
+      <div style="font-size:13px;color:var(--dim);margin-top:6px">Already hosted before?</div>
+      <button class="secondary" id="goSignIn">Sign In</button>
     </div>`;
+
+  // Live-format as you type: uppercase, no spaces. The server already
+  // does upper(trim(...)) on submit — this is purely so what you see
+  // matches what will actually be checked, nothing more.
+  $('#joinCode').oninput = e => {
+    const pos = e.target.selectionStart;
+    const before = e.target.value.length;
+    e.target.value = e.target.value.toUpperCase().replace(/\s+/g, '');
+    const after = e.target.value.length;
+    e.target.setSelectionRange(pos - (before - after), pos - (before - after));
+    e.target.classList.remove('input-error');
+  };
+
   $('#joinGo').onclick = async () => {
     const c = $('#joinCode').value.trim();
     const n = $('#joinName').value.trim() || 'Guest';
+    const err = $('#joinErr');
+    err.style.display = 'none';
+    $('#joinCode').classList.remove('input-error');
+
+    if(!c){ $('#joinCode').classList.add('input-error'); err.textContent = 'Enter the invite code.'; err.style.display='block'; return; }
+
+    $('#joinGo').disabled = true;
     $('#joinGo').textContent = 'Joining…';
     const { data, error } = await sb.rpc('join_night', { p_code: c, p_display_name: n });
-    if(error){ $('#ovSub').textContent = error.message; $('#joinGo').textContent = 'Join'; return; }
+    if(error){
+      err.textContent = error.message; err.style.display = 'block';
+      $('#joinGo').disabled = false; $('#joinGo').textContent = 'Join Night';
+      return;
+    }
     const { data: person, error: pErr } = await sb.from('person').select('*').eq('id', me.id).single();
     if(pErr || !person){
-      $('#ovSub').textContent = 'Joined, but could not reload your profile: ' + (pErr?.message ?? 'not found');
-      $('#joinGo').textContent = 'Join';
+      err.textContent = 'Joined, but could not reload your profile: ' + (pErr?.message ?? 'not found');
+      err.style.display = 'block';
+      $('#joinGo').disabled = false; $('#joinGo').textContent = 'Join Night';
       return;
     }
     me = person;
@@ -456,16 +668,23 @@ function promptJoin(code){
 }
 
 function promptSignIn(){
-  overlay('Sign in','Get back into an account you\'ve already linked an email to.');
+  overlay('Sign in', 'Get back into an account you\'ve already linked an email to.');
   $('#ovBody').innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:10px;align-items:center;margin-top:6px;width:100%;max-width:260px">
-      <input id="signInEmail" type="email" placeholder="you@example.com">
-      <button id="sendSignIn">Send sign-in link</button>
-      <button id="backToJoin3" style="background:none;border:1px solid var(--line);color:var(--paper)">Back</button>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px;width:100%">
+      <div class="field-label">Email</div>
+      <input id="signInEmail" type="email" placeholder="you@example.com" autocomplete="email">
+      <div class="field-error" id="signInErr" style="display:none"></div>
+      <button id="sendSignIn" style="margin-top:4px">Send Sign-In Link</button>
+      <button class="secondary" id="backToJoin3">Back</button>
     </div>`;
   $('#sendSignIn').onclick = async () => {
     const email = $('#signInEmail').value.trim();
-    if(!email) return;
+    const err = $('#signInErr');
+    err.style.display = 'none';
+    $('#signInEmail').classList.remove('input-error');
+    if(!email){ $('#signInEmail').classList.add('input-error'); err.textContent = 'Enter your email.'; err.style.display='block'; return; }
+
+    $('#sendSignIn').disabled = true;
     $('#sendSignIn').textContent = 'Sending…';
     const redirectTo = location.href.split('?')[0].split('#')[0];
     // shouldCreateUser:false — this is for someone getting back into an
@@ -475,10 +694,11 @@ function promptSignIn(){
       email, options: { emailRedirectTo: redirectTo, shouldCreateUser: false }
     });
     if(error){
-      $('#ovSub').textContent = error.message.match(/signup|not allowed|not found/i)
-        ? 'No account found for that email — use "Start a Night Out" to create one.'
+      err.textContent = error.message.match(/signup|not allowed|not found/i)
+        ? 'No account found for that email — use "Start a Night" to create one.'
         : error.message;
-      $('#sendSignIn').textContent = 'Send sign-in link';
+      err.style.display = 'block';
+      $('#sendSignIn').disabled = false; $('#sendSignIn').textContent = 'Send Sign-In Link';
       return;
     }
     overlay('Check your email', `Sent a sign-in link to <code>${email}</code>.<br><br>Tap it — you'll land back here signed in, on any device.`);
@@ -487,22 +707,29 @@ function promptSignIn(){
 }
 
 function promptStart(){
-  overlay('Start a Night Out','Give it a name — or skip and we\'ll date-stamp it.');
+  overlay('Start a Night Out', 'Give it a name — or skip and we\'ll date-stamp it.');
   $('#ovBody').innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:10px;align-items:center;margin-top:6px;width:100%;max-width:260px">
-      <input id="hostName" placeholder="Your name" maxlength="24"
+    <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px;width:100%">
+      <div class="field-label">Your name</div>
+      <input id="hostName" placeholder="e.g. Rick" maxlength="24" autocomplete="name"
         value="${me.display_name && me.display_name !== 'Guest' ? me.display_name : ''}">
+      <div class="field-label">Night name (optional)</div>
       <input id="nightTitle" placeholder="e.g. Dave's Birthday" maxlength="60">
-      <button id="createGo">Create</button>
-      <button id="backToJoin" style="background:none;border:1px solid var(--line);color:var(--paper)">Back</button>
+      <button id="createGo" style="margin-top:4px">Create Night</button>
+      <button class="secondary" id="backToJoin">Back</button>
     </div>`;
   $('#createGo').onclick = async () => {
+    $('#createGo').disabled = true;
     $('#createGo').textContent = 'Creating…';
     const { data, error } = await sb.rpc('create_night', {
       p_title: $('#nightTitle').value.trim() || null,
       p_display_name: $('#hostName').value.trim() || null
     });
-    if(error){ $('#ovSub').textContent = error.message; $('#createGo').textContent = 'Create'; return; }
+    if(error){
+      $('#ovSub').textContent = error.message;
+      $('#createGo').disabled = false; $('#createGo').textContent = 'Create Night';
+      return;
+    }
     const row = Array.isArray(data) ? data[0] : data;
     const { data: person } = await sb.from('person').select('*').eq('id', me.id).single();
     if(person) me = person;
@@ -512,16 +739,35 @@ function promptStart(){
 }
 
 function showNightCreated(nightId, code){
-  overlay('Night Out started','Share this code so people can join.');
+  overlay('Night Out Started', 'Share this code, or let them scan in.');
+  const inviteUrl = `${location.origin}${location.pathname}?code=${code}`;
   $('#ovBody').innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:12px;align-items:center;margin-top:6px;width:100%;max-width:260px">
-      <div class="code-chip" style="font-size:22px;padding:10px 20px">${code}</div>
-      <button id="copyCode">Copy code</button>
-      <button id="goInside">Let's go</button>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px;width:100%">
+      <div class="code-display">${groupCode(code)}</div>
+      <div class="qr-wrap"><canvas id="qrCanvas"></canvas></div>
+      <button id="shareInviteBtn" style="margin-top:4px">Share Invite</button>
+      <button class="secondary" id="copyCode">Copy Code</button>
+      <button id="goInside" style="margin-top:8px">Open the Night</button>
     </div>`;
+  // Dark-on-light regardless of app theme — QR scanability needs real
+  // contrast, not palette-matching. Not yet confirmed against a live phone
+  // camera (see handoff open gaps); encodes the exact same invite URL that
+  // Share/Copy use, nothing derived separately.
+  QRCode.toCanvas($('#qrCanvas'), inviteUrl, {
+    width: 150, margin: 1, color: { dark: '#1A1520', light: '#F5EFE6' }
+  }).catch(e => console.error('QR render failed:', e));
+  $('#shareInviteBtn').onclick = async () => {
+    const result = await shareInvite(code, 'your night');
+    if(result === 'shared') toast('Shared');
+  };
   $('#copyCode').onclick = async () => {
-    try{ await navigator.clipboard.writeText(code); toast('Copied'); }
-    catch{ toast('Copy failed — code is ' + code, true); }
+    try{
+      await navigator.clipboard.writeText(code);
+      const btn = $('#copyCode');
+      btn.classList.add('copied'); btn.textContent = 'Copied ✓';
+      setTimeout(() => { btn.classList.remove('copied'); btn.textContent = 'Copy Code'; }, 1800);
+      toast('Copied');
+    } catch { toast('Copy failed — code is ' + code, true); }
   };
   $('#goInside').onclick = () => load(nightId);
 }
@@ -624,10 +870,14 @@ function renderHeader(){
   const live = expenses.filter(e => e.status !== 'disputed' && e.status !== 'void');
   const grand = live.reduce((s,e)=> s + totalOf(e), 0);
   const mine = balances.find(b => b.person_id === me.id);
+  const activeCount = members.filter(m => presentAt(m, now)).length;
   $('#hdrTitle').textContent = night.title;
-  $('#hdrTotal').textContent = money0(grand);
-  $('#hdrYou').textContent   = money0(mine?.owed_cents ?? 0);
-  $('#hdrOut').textContent   = `${members.filter(m => presentAt(m, now)).length}/${members.length}`;
+  // money() — the exact same cents-precise formatter used for every
+  // expense/settlement amount elsewhere — not the separate money0()
+  // rounder. The header must never disagree with the numbers below it.
+  $('#hdrTotal').textContent = money(grand);
+  $('#hdrYou').textContent   = money(mine?.owed_cents ?? 0);
+  $('#hdrOut').textContent   = `${activeCount} / ${members.length}`;
   $('#fab').style.display    = isOpen() ? 'flex' : 'none';
 
   const lcFab = $('#btnLastCallFab');
@@ -666,26 +916,45 @@ function renderTonight(){
             ${nameOf(v.m.person_id)} ${v.type==='in'?'tapped in':'tapped out'} · ${clock(v.t)}
             <span class="bar"></span></div>`;
         }
-        const e = v.e, W = sumW(e), uneven = e.allocation.some(a => Number(a.weight) !== 1);
-        return `<div class="exp ${e.status}" data-edit="${e.id}">
+        const e = v.e, uneven = e.allocation.some(a => Number(a.weight) !== 1);
+        const participants = e.allocation.length;
+        // "N-way"/"shares" was internal bill-splitting jargon on the card
+        // itself; plain participant count now, uneven split still called
+        // out in words. The exact per-person weight math is untouched and
+        // still lives in the edit sheet where it's actually adjusted.
+        const participantPhrase = participants === 1 ? '1 participant'
+          : uneven ? `${participants} participants · uneven split`
+          : `${participants} participants`;
+        const stopLabel = s.name ?? 'Stop ' + (i+1);
+        return `<div class="exp ${e.status}" ${isOpen() ? `data-edit="${e.id}"` : ''}>
           ${avatar(e.payer_id)}
           <div class="exp-mid">
-            <div class="exp-note">${e.note ?? 'Expense'}</div>
-            <div class="exp-meta">${nameOf(e.payer_id)} paid${e.tip_cents?` · ${money(e.tip_cents)} tip`:''}${e.status==='disputed'?' · FLAGGED':''}</div>
+            <div class="exp-head">
+              <div class="exp-note">${e.note ?? 'Expense'}</div>
+              ${e.status==='disputed' ? '<span class="exp-flagtag">Flagged</span>' : ''}
+            </div>
+            <div class="exp-meta">${nameOf(e.payer_id)} paid · ${participantPhrase}</div>
+            <div class="exp-sub">${clock(e.occurred_at)} · ${stopLabel}${e.tip_cents ? ` · ${money(e.tip_cents)} tip` : ''}</div>
           </div>
-          <div>
-            <div class="exp-amt">${money(totalOf(e))}</div>
-            <div class="exp-split">${uneven?`${W} shares`:`${e.allocation.length}-way`} · ${money(Math.round(totalOf(e)/W))}${uneven?'/sh':''}</div>
-          </div>
-          <button class="flag ${e.status==='disputed'?'on':''}" data-flag="${e.id}">⚑</button>
+          <div class="exp-amt-col"><div class="exp-amt">${money(totalOf(e))}</div></div>
+          <button class="flag ${e.status==='disputed'?'on':''}" data-flag="${e.id}"
+            aria-label="${e.status==='disputed' ? 'Remove dispute flag — include this back in the tab' : 'Flag as disputed — hold this out of the tab'}"
+            title="${e.status==='disputed' ? 'Unflag' : 'Flag as disputed'}">
+            <span class="flag-ico" aria-hidden="true">⚑</span><span class="flag-lbl">${e.status==='disputed'?'Flagged':'Flag'}</span>
+          </button>
+          ${isOpen() ? '<span class="exp-chev" aria-hidden="true">›</span>' : ''}
         </div>`;
       }).join('')}
     </div>`;
   }).join('');
 
-  $('#pane-tonight').innerHTML = html || `<div style="text-align:center;padding:50px 10px;color:var(--dim2)">
-      <div style="font-family:Anton;font-size:20px;color:var(--paper)">Nothing logged yet</div>
-      <p style="font-size:13px;margin-top:8px;line-height:1.6">Hit <b>+ Round</b> when someone buys.</p></div>`;
+  $('#pane-tonight').innerHTML = html || `<div class="empty-tonight">
+      <div class="empty-title">No rounds yet</div>
+      <p class="empty-sub">Add the first round and choose who was included.</p>
+      <button class="empty-cta" id="emptyAddRound">+ Add First Round</button>
+    </div>`;
+
+  if($('#emptyAddRound')) $('#emptyAddRound').onclick = () => openAdd('round');
 
   $('#pane-tonight').querySelectorAll('[data-flag]').forEach(b => b.onclick = async ev => {
     ev.stopPropagation();
@@ -705,21 +974,13 @@ function renderCrew(){
 
   const canLeave = !isHost() || !isOpen();
 
-  const inviteUrl = `${location.origin}${location.pathname}?code=${night.join_code}`;
-  const smsBody = `Join "${night.title}" on Last Call — code ${night.join_code}\n${inviteUrl}`;
-  // iOS and Android disagree on the sms: URI format. This is the
-  // standard cross-platform workaround; there's no reliable feature
-  // detection for it, just user-agent sniffing.
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  const smsHref = (isIOS ? 'sms:&body=' : 'sms:?body=') + encodeURIComponent(smsBody);
-
   $('#pane-crew').innerHTML =
     `<div class="note-box"><b style="color:var(--paper)">Presence drives the split.</b><br>
       Tap someone out when they leave and every expense logged after that skips them automatically.
       ${isHost() ? `<br><br>Join code: <span class="code-chip">${night.join_code}</span>
-        <a href="${smsHref}" style="display:inline-block;margin-left:8px;background:var(--amber);
-          color:var(--ink);border-radius:8px;padding:6px 12px;font-family:'IBM Plex Mono',monospace;
-          font-size:11px;letter-spacing:.06em;text-transform:uppercase;text-decoration:none">Text it</a>` : ''}
+        <button id="btnTextCode" style="display:inline-block;margin-left:8px;background:var(--amber);
+          color:var(--ink);border:none;border-radius:var(--r-sm);padding:8px 14px;
+          font-size:12px;font-weight:600;cursor:pointer">Share</button>` : ''}
       <br><br><button class="link" id="btnSwitchNight" style="padding:0">Not this night? Switch</button>
       <br>${canLeave
         ? `<button class="link" id="btnLeaveNight" style="padding:0;color:var(--magenta)">Leave this night entirely</button>`
@@ -769,6 +1030,12 @@ function renderCrew(){
       .eq('night_id', night.id).eq('person_id', m.person_id);
     if(error) return toast(error.message, true);
   });
+
+  const tc = $('#btnTextCode');
+  if(tc) tc.onclick = async () => {
+    const result = await shareInvite(night.join_code, night.title);
+    if(result === 'shared') toast('Shared');
+  };
 
   const sw = $('#btnSwitchNight');
   if(sw) sw.onclick = confirmSwitchNight;
@@ -899,15 +1166,31 @@ const goTab = n => document.querySelector(`nav button[data-tab="${n}"]`).click()
 
 /* ---------- last call ---------- */
 function confirmLastCall(){
-  overlay('Call it?', 'This closes the night, nets the ledger, and locks every expense in.');
-  $('#ovBody').innerHTML = `
-    <div style="display:flex;gap:10px;width:100%;max-width:260px;margin-top:6px">
-      <button id="lcCancel" style="flex:1;background:none;border:1px solid var(--line);color:var(--paper)">Not yet</button>
-      <button id="lcConfirm" style="flex:1;background:var(--magenta)">Last Call</button>
-    </div>`;
-  $('#lcCancel').onclick = hideOverlay;
-  $('#lcConfirm').onclick = doLastCall;
+  // Reuses the exact same figures the rest of the dashboard already
+  // computes — grand total via totalOf() (same as the header), presence
+  // via presentAt() (same as the header's Active count), and the live
+  // settle_night plan (same rows the Tab pane renders) — nothing here is
+  // a separate calculation invented for this sheet.
+  const now = new Date();
+  const live = expenses.filter(e => e.status !== 'disputed' && e.status !== 'void');
+  const grand = live.reduce((s,e)=> s + totalOf(e), 0);
+  const stillOut = members.filter(m => presentAt(m, now)).length;
+  const unresolved = plan.filter(p => !p.is_dust).length;
+
+  $('#lcSummary').innerHTML = `
+    <div class="lc-row"><span>Current total</span><b>${money(grand)}</b></div>
+    <div class="lc-row"><span>People still out</span><b>${stillOut} of ${members.length}</b></div>
+    <div class="lc-row"><span>Unresolved balances</span><b>${unresolved}</b></div>`;
+
+  $('#scrim').classList.add('on');
+  $('#lastCallSheet').classList.add('on');
 }
+function closeLastCallSheet(){
+  $('#lastCallSheet').classList.remove('on');
+  $('#scrim').classList.remove('on');
+}
+$('#lcKeepBtn').onclick = closeLastCallSheet;
+$('#lcEndBtn').onclick  = () => { closeLastCallSheet(); doLastCall(); };
 
 async function doLastCall(){
   overlay('Closing out','NETTING THE LEDGER…');
@@ -1092,7 +1375,7 @@ $('#btnRound').onclick   = () => openAdd('round');
 $('#btnLastCallFab').onclick = () => { if(isHost()) confirmLastCall(); };
 $('#btnStop').onclick    = () => openNewStop();
 $('#cancelBtn').onclick  = close;
-$('#scrim').onclick      = () => { close(); closeStopSheet(); };
+$('#scrim').onclick      = () => { close(); closeStopSheet(); closeLastCallSheet(); };
 
 function openNewStop(){
   $('#stopName').value = '';
@@ -1142,17 +1425,38 @@ $('#confirmBtn').onclick = async () => {
   const { error: aerr } = await sb.from('allocation').insert(
     draft.alloc.map(a => ({ expense_id: data.id, person_id: a.p, weight: a.w })));
   close();
-  toast(aerr ? aerr.message : `Logged · ${money(baseOf()+tipOf())} across ${draft.alloc.length}`, !!aerr);
+  if(aerr) return toast(aerr.message, true);
+  // Undo reuses the exact delete-by-id already proven out by voidBtn —
+  // no new deletion path, just the same one triggered from a toast
+  // instead of the edit sheet, while the row is still fresh.
+  toast(`Logged · ${money(baseOf()+tipOf())} across ${draft.alloc.length}`, false, {
+    label: 'Undo',
+    onAction: async () => {
+      const { error: uerr } = await sb.from('expense').delete().eq('id', data.id);
+      toast(uerr ? uerr.message : 'Round removed', !!uerr);
+    }
+  });
 };
 
 /* ---------- chrome ---------- */
 let tT;
-function toast(msg, isErr = false){
+function toast(msg, isErr = false, action = null){
   const t = $('#toast');
-  t.textContent = msg;
-  t.className = 'toast on' + (isErr ? ' err' : '');
+  t.textContent = '';
+  if(action){
+    const span = document.createElement('span');
+    span.textContent = msg;
+    const btn = document.createElement('button');
+    btn.className = 'toast-action';
+    btn.textContent = action.label;
+    btn.onclick = () => { t.className = 'toast'; clearTimeout(tT); action.onAction(); };
+    t.append(span, btn);
+  } else {
+    t.textContent = msg;
+  }
+  t.className = 'toast on' + (isErr ? ' err' : '') + (action ? ' actionable' : '');
   clearTimeout(tT);
-  tT = setTimeout(() => t.className = 'toast', 3200);
+  tT = setTimeout(() => t.className = 'toast', action ? 4200 : 3200);
 }
 function overlay(title, sub){
   $('#ovTitle').textContent = title;
