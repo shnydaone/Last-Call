@@ -369,6 +369,8 @@ function refresh(){
    ============================================================ */
 const avatar = id => `<div class="av" style="background:${colorFor(id)}">${initials(nameOf(id))}</div>`;
 
+let currentTab = 'tonight';
+
 function renderHeader(){
   if(!night) return;
   const now = new Date();
@@ -383,15 +385,16 @@ function renderHeader(){
   $('#hdrTotal').textContent = money(grand);
   $('#hdrYou').textContent   = money(mine?.owed_cents ?? 0);
   $('#hdrOut').textContent   = `${activeCount} of ${members.length}`;
-  $('#fab').style.display    = isOpen() ? 'flex' : 'none';
+  updateFabVisibility();
 
-  // Compact reminder bar — same grand total, same open/closed state, no
-  // second source of truth. Text content only; visibility is driven
-  // purely by scroll position (see the listener set up once, below).
+  // Compact row — same grand/isOpen(), no second source of truth. Text
+  // content only; visibility is driven purely by scroll state (see the
+  // header-state logic near boot(), below).
   $('#hdrCompactTotal').textContent = money(grand);
   const compactLive = $('#hdrCompactLive');
   compactLive.className = 'hdr-compact-live' + (isOpen() ? '' : ' closed');
   compactLive.innerHTML = `<span class="dot"></span>${isOpen() ? 'Live' : 'Closed'}`;
+  updateCompactTitle();
 
   // Optional one-line orientation ("STOP 2 · 3 ROUNDS") — only shown once
   // a stop genuinely exists, using data already fetched for the Tonight
@@ -468,9 +471,9 @@ function renderTonight(){
           <div class="exp-amt-col">
             <div class="exp-amt">${money(totalOf(e))}</div>
             <button class="receipt-btn ${e.receipt_url?'on':''}" data-receipt="${e.receipt_url?e.id:''}"
-              aria-label="${e.receipt_url ? 'View attached receipt photo' : 'No receipt attached'}"
+              aria-label="${e.receipt_url ? 'View attached receipt' : 'No receipt attached'}"
               title="${e.receipt_url ? 'View receipt' : 'No receipt attached'}">
-              <span aria-hidden="true">📷</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
             </button>
           </div>
           <button class="flag ${e.status==='disputed'?'on':''}" data-flag="${e.id}"
@@ -520,9 +523,13 @@ function renderTonight(){
 // one used for Connecting/Join/the info guide), no new modal machinery.
 function viewReceipt(url){
   overlay('Receipt', '');
-  $('#ovBody').innerHTML = `
-    <img src="${url}" alt="Receipt photo" class="receipt-view-img">
-    <button id="receiptViewClose" style="margin-top:14px">Close</button>`;
+  const isImage = /\.(jpe?g|png|gif|webp|heic|heif)(\?|$)/i.test(url);
+  $('#ovBody').innerHTML = isImage
+    ? `<img src="${url}" alt="Receipt photo" class="receipt-view-img">
+       <button id="receiptViewClose" style="margin-top:14px">Close</button>`
+    : `<p class="hint" style="margin-bottom:14px">This receipt is a file, not a photo — open it to view it.</p>
+       <a class="confirm" href="${url}" target="_blank" rel="noopener" style="display:block;text-decoration:none;text-align:center">Open Receipt</a>
+       <button id="receiptViewClose" style="margin-top:10px">Close</button>`;
   $('#receiptViewClose').onclick = hideOverlay;
 }
 
@@ -848,11 +855,22 @@ async function shareTabSummary(grand, collect, final){
 function renderAll(){ if(!night) return; renderHeader(); renderTonight(); renderCrew(); renderTab(); }
 
 /* ---------- tabs ---------- */
+function updateFabVisibility(){
+  $('#fab').style.display = (currentTab === 'tab' || !isOpen() || (currentTab === 'tonight' && !expenses.length))
+    ? 'none' : 'flex';
+}
+
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   document.querySelectorAll('nav button').forEach(x => x.setAttribute('aria-selected', x === b));
   document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'pane-' + b.dataset.tab));
-  $('#fab').style.display = (b.dataset.tab === 'tab' || !isOpen()) ? 'none' : 'flex';
+  currentTab = b.dataset.tab;
+  updateFabVisibility();
   $('main').scrollTop = 0;
+  // scrollTop = 0 is a no-op (fires no 'scroll' event) if already at 0 —
+  // switching tabs must always land on the expanded state regardless,
+  // so this is set directly rather than relying on the scroll listener.
+  setHeaderCompact(false);
+  updateCompactTitle();
 });
 const goTab = n => document.querySelector(`nav button[data-tab="${n}"]`).click();
 
@@ -899,8 +917,7 @@ let draft = null;
 const baseOf = () => draft.editing ? draft.base : parseInt(draft.digits || '0', 10);
 const tipOf  = () => {
   if(draft.editing) return draft.fixedTip;
-  if(!draft.tipMode) return 0;
-  return Math.round(baseOf() * draft.tip / 100);
+  return draft.tip ? Math.round(baseOf() * draft.tip / 100) : 0;
 };
 const wSum = () => draft.alloc.reduce((s,a)=>s+a.w, 0);
 
@@ -909,22 +926,24 @@ function eligible(kind, at){
 }
 
 function applyKindLabels(){
-  $('#shTitle').textContent = draft.kind === 'round' ? "Who's buying?" : 'Log an expense';
-  $('#shHint').textContent  = draft.kind === 'round'
-    ? 'Split defaults to whoever is out right now, minus anyone off rounds.'
-    : "Cover, cab, coat check, cash tip — anything that isn't a round.";
-  $('#toggleKind').textContent = draft.kind === 'round'
-    ? 'Not a round? Log something else instead'
-    : 'Actually, this is a round';
+  $('#shTitle').textContent = draft.kind === 'round' ? 'Add Round' : 'Add Expense';
+  // No permanent helper paragraph — "Split a round to keep things fair"
+  // was exactly the boilerplate this pass asked to remove from a
+  // repeated action. Hidden entirely for add-mode; openEdit() below
+  // still uses #shHint for one-time context about the specific expense
+  // being edited, which is genuinely per-instance info, not boilerplate.
+  $('#shHint').style.display = 'none';
+  $('#toggleKind').textContent = draft.kind === 'round' ? 'Other expense' : 'Log a round instead';
 }
 
 function openAdd(kind){
   const at = new Date();
-  draft = { editing:null, kind, payer: me.id, digits:'', tip: 0, tipMode:false, description:'',
-            receiptUrl: null,
+  draft = { editing:null, kind, payer: me.id, digits:'', tip: 0, description:'',
+            receiptUrl: null, receiptFileName: null, receiptUploading: false, receiptError: null,
+            payerOpen: false, tipCustomOpen: false,
             showShares:false, at, alloc: eligible(kind, at).map(p => ({p, w:1})) };
   applyKindLabels();
-  $('#toggleKind').style.display = 'block';
+  $('#toggleKind').style.display = 'inline-block';
   $('#pad').style.display = 'grid';
   $('#voidBtn').style.display = 'none';
   show();
@@ -933,11 +952,16 @@ function openEdit(id){
   if(!isOpen()) return toast('Tab is closed', true);
   const e = expenses.find(x => x.id === id);
   draft = { editing:id, kind:e.kind, payer:e.payer_id, base:e.base_cents, fixedTip:e.tip_cents,
-            description: e.description || '', receiptUrl: e.receipt_url || null,
+            description: e.description || '', receiptUrl: e.receipt_url || null, receiptFileName: null,
+            receiptUploading: false, receiptError: null, payerOpen: false, tipCustomOpen: false,
             showShares: e.allocation.some(a => Number(a.weight) !== 1), at: new Date(e.occurred_at),
             alloc: e.allocation.map(a => ({ p:a.person_id, w:Number(a.weight) })) };
   $('#shTitle').textContent = 'Edit expense';
+  // Editing is a one-off action on a specific, already-existing expense —
+  // this context line is genuinely new information each time, not a
+  // repeated boilerplate explanation, so it stays visible here.
   $('#shHint').textContent = `${e.note ?? 'Expense'}${e.description ? ' — ' + e.description : ''} · logged ${clock(e.occurred_at)}. Drop someone out or give them a bigger share.`;
+  $('#shHint').style.display = 'block';
   $('#toggleKind').style.display = 'none';
   $('#pad').style.display = 'none';
   $('#voidBtn').style.display = 'block';
@@ -950,7 +974,12 @@ $('#toggleKind').onclick = () => {
   renderSheet();
 };
 function show(){ renderSheet(); $('#scrim').classList.add('on'); $('#sheet').classList.add('on'); }
-function close(){ $('#scrim').classList.remove('on'); $('#sheet').classList.remove('on'); }
+function close(){
+  $('#scrim').classList.remove('on'); $('#sheet').classList.remove('on');
+  // Abandoning the whole flow closes any child sheet left open too.
+  $('#editSplitSheet').classList.remove('on');
+  $('#detailsSheet').classList.remove('on');
+}
 
 // Drag-to-dismiss, from the header zone (handle/title/hint) only —
 // not the interactive body — so it doesn't hijack typing or tapping
@@ -987,57 +1016,200 @@ function makeSwipeToClose(sheetEl, closeFn){
   handle.addEventListener('pointerup', release);
   handle.addEventListener('pointercancel', release);
 }
-makeSwipeToClose($('#sheet'), close);
 makeSwipeToClose($('#stopSheet'), closeStopSheet);
+// Big sheets (Add Round + its two children) use an explicit × close
+// button instead of swipe-to-dismiss, matching the near-full-screen
+// header pattern — no makeSwipeToClose() call for these three.
 
 function renderSheet(){
   const at = draft.at;
-  $('#payerRow').innerHTML = members.map(m => `
-    <button class="${draft.payer===m.person_id?'on':''} ${presentAt(m,at)?'':'away'}" data-payer="${m.person_id}">
-      <span class="mini" style="background:${colorFor(m.person_id)}">${initials(m.person.display_name)}</span>${m.person.display_name}</button>`).join('');
-  $('#payerRow').querySelectorAll('[data-payer]').forEach(b => b.onclick = () => { draft.payer = b.dataset.payer; renderSheet(); });
 
-  const tot = baseOf() + tipOf(), W = wSum() || 1;
-  const sub = draft.tipMode
-    ? `${money(baseOf())} + ${money(tipOf())} tip${draft.alloc.length?` · ${money(Math.round(tot/W))}/share`:''}`
-    : (draft.alloc.length ? `${money(Math.round(tot/W))}/share` : 'total');
-  $('#amtDisp').innerHTML = tot
-    ? `${money(tot)}<span style="font-size:12px;color:var(--dim2);display:block;margin-top:2px">${sub}</span>`
-    : `$0.00<span style="font-size:12px;color:var(--dim2);display:block;margin-top:2px">tap the keypad</span>`;
-
-  // Total-first by default — most people just know what they paid.
-  // The tip calculator is opt-in for anyone who'd rather work from a
-  // subtotal + tip%; switching modes clears the digits so a typed
-  // total is never silently reinterpreted as a subtotal (or vice versa).
-  $('#tipToggle').style.display = draft.editing ? 'none' : 'block';
-  $('#tipToggle').textContent = draft.tipMode ? 'Enter total directly' : '+ Calculate a tip';
-  $('#tipToggle').onclick = () => {
-    draft.tipMode = !draft.tipMode;
-    draft.digits = '';
-    draft.tip = 0;
+  // Paid-by — collapsed pill showing the current payer; tapping it
+  // reveals the same selection row used before (unchanged click logic),
+  // and picking someone auto-collapses it back down.
+  const payer = M(draft.payer);
+  $('#payerPillAvatar').style.background = colorFor(draft.payer);
+  $('#payerPillAvatar').textContent = initials(payer?.person?.display_name);
+  $('#payerPillName').textContent = payer?.person?.display_name ?? '—';
+  $('#payerPill').setAttribute('aria-expanded', String(draft.payerOpen));
+  $('#payerPill').onclick = () => {
+    draft.payerOpen = !draft.payerOpen;
     renderSheet();
+    if(draft.payerOpen) requestAnimationFrame(() =>
+      ($('#payerRow').querySelector('[data-payer].on') || $('#payerRow').querySelector('[data-payer]'))?.focus());
   };
-  $('#tipRow').style.display = (!draft.editing && draft.tipMode) ? 'flex' : 'none';
-  $('#tipRow').querySelectorAll('.chip').forEach(c => {
-    c.classList.toggle('on', String(draft.tip) === c.dataset.tip);
-    c.onclick = () => { draft.tip = +c.dataset.tip; renderSheet(); };
+  $('#payerRow').style.display = draft.payerOpen ? 'flex' : 'none';
+  $('#payerRow').innerHTML = members.map(m => `
+    <button class="${draft.payer===m.person_id?'on':''} ${presentAt(m,at)?'':'away'}" data-payer="${m.person_id}"
+      aria-pressed="${draft.payer===m.person_id}">
+      <span class="mini" style="background:${colorFor(m.person_id)}">${initials(m.person.display_name)}</span>${m.person.display_name}</button>`).join('');
+  $('#payerRow').querySelectorAll('[data-payer]').forEach(b => b.onclick = () => {
+    draft.payer = b.dataset.payer;
+    draft.payerOpen = false;
+    renderSheet();
   });
 
-  $('#expDesc').value = draft.description || '';
-  $('#expDesc').oninput = e => { draft.description = e.target.value; };
+  // Amount — tip presets are always visible now (not opt-in). draft.tip
+  // is 0 until a preset or custom % is actively chosen; nothing is
+  // pre-selected. Same base*tip%/100 math as before either way.
+  const tot = baseOf() + tipOf(), W = wSum() || 1;
+  const sub = draft.tip
+    ? `${money(baseOf())} + ${money(tipOf())} tip · ${money(tot)} total`
+    : (draft.alloc.length ? `${money(Math.round(tot/W))}/person` : '');
+  // No "tap the keypad" helper at $0 anymore — the keypad being right
+  // there already makes the interaction obvious.
+  $('#amtDisp').innerHTML = tot
+    ? `${money(baseOf())}${sub ? `<span style="font-size:12px;color:var(--dim2);display:block;margin-top:2px">${sub}</span>` : ''}`
+    : `$0.00`;
 
-  const rBtn = $('#receiptAttachBtn'), rLbl = $('#receiptAttachLabel');
-  rBtn.classList.toggle('on', !!draft.receiptUrl);
-  rLbl.textContent = draft.receiptUrl ? 'Receipt attached · Tap to replace' : 'Attach Receipt';
+  $('#tipRow').style.display = draft.editing ? 'none' : 'flex';
+  $('#tipRow').querySelectorAll('.chip[data-tip]').forEach(c => {
+    const on = String(draft.tip) === c.dataset.tip;
+    c.classList.toggle('on', on);
+    c.setAttribute('aria-pressed', String(on));
+    c.onclick = () => {
+      draft.tip = (String(draft.tip) === c.dataset.tip) ? 0 : +c.dataset.tip;
+      draft.tipCustomOpen = false;
+      renderSheet();
+    };
+  });
+  const customActive = draft.tip && ![18,20].includes(draft.tip);
+  $('#tipCustomBtn').classList.toggle('on', customActive || draft.tipCustomOpen);
+  $('#tipCustomBtn').setAttribute('aria-pressed', String(customActive || draft.tipCustomOpen));
+  $('#tipCustomBtn').onclick = () => { draft.tipCustomOpen = !draft.tipCustomOpen; renderSheet(); };
+  $('#tipCustomInput').style.display = (!draft.editing && draft.tipCustomOpen) ? 'block' : 'none';
+  if(draft.tipCustomOpen && document.activeElement !== $('#tipCustomInput')){
+    $('#tipCustomInput').value = customActive ? draft.tip : '';
+  }
+  $('#tipCustomInput').oninput = e => {
+    draft.tip = Math.max(0, Math.min(100, +e.target.value || 0));
+    const t2 = baseOf() + tipOf();
+    const s2 = draft.tip ? `${money(baseOf())} + ${money(tipOf())} tip · ${money(t2)} total`
+                          : (draft.alloc.length ? `${money(Math.round(t2/(wSum()||1)))}/person` : '');
+    const subEl = $('#amtDisp').querySelector('span');
+    if(subEl) subEl.textContent = s2;
+    updateSplitSummary();
+    updateConfirmAndWarnings();
+  };
+
+  updateSplitSummary();
+
+  // Details row — one line summarizing both note and receipt state.
+  // Neither field is ever shown expanded on the main screen anymore;
+  // both live in the Round Details child sheet.
+  const hasNote = !!draft.description, hasReceipt = !!draft.receiptUrl;
+  $('#detailsRow').classList.toggle('filled', hasNote || hasReceipt);
+  $('#detailsRowLabel').textContent =
+    hasNote && hasReceipt ? 'Note + receipt added'
+    : hasNote ? 'Note added'
+    : hasReceipt ? 'Receipt attached'
+    : 'Add note or receipt';
+  $('#detailsRow').onclick = showDetails;
+
+  $('#splitSummaryRow').onclick = showEditSplit;
+
+  updateConfirmAndWarnings();
+}
+
+// Split summary — shown on the main screen and recomputed on every
+// amount/tip/participant change. Reused verbatim by the Edit Split
+// sheet's own header line.
+function splitSummaryText(){
+  const tot = baseOf() + tipOf(), W = wSum() || 1;
+  const uneven = draft.alloc.some(a => a.w !== 1);
+  const names = draft.alloc.map(a => nameOf(a.p));
+  let namesLine = '';
+  if(names.length > 4){
+    namesLine = `${names.slice(0,3).join(', ')} +${names.length-3} more`;
+  } else if(names.length === 2){
+    namesLine = names.join(' and ');
+  } else if(names.length > 2){
+    namesLine = `${names.slice(0,-1).join(', ')} and ${names[names.length-1]}`;
+  } else {
+    namesLine = names.join('');
+  }
+
+  if(!draft.alloc.length) return { headline: 'No one selected yet', names: '' };
+  if(uneven) return { headline: `Uneven split · ${draft.alloc.length} people`, names: namesLine };
+  if(!tot) return { headline: `${draft.alloc.length} people selected`, names: namesLine };
+  if(draft.alloc.length === 1) return { headline: `${names[0]} covers ${money(tot)}`, names: '' };
+  return { headline: `Split ${draft.alloc.length} ways · ${money(Math.round(tot/W))} each`, names: namesLine };
+}
+function updateSplitSummary(){
+  const { headline, names } = splitSummaryText();
+  $('#splitSummaryHeadline').textContent = headline;
+  $('#splitSummaryNames').textContent = names;
+}
+
+// Split out so the tip-custom-input's live update (which deliberately
+// skips a full renderSheet() to avoid resetting its own cursor) can
+// still keep the confirm button and warnings in sync.
+function updateConfirmAndWarnings(){
+  const tot = baseOf() + tipOf(), W = wSum() || 1;
+  const ok = draft.alloc.length > 0 && (draft.editing || baseOf() > 0);
+  $('#confirmBtn').disabled = !ok || draft.receiptUploading;
+  $('#confirmBtn').textContent = !draft.alloc.length ? "Pick who it's for"
+    : draft.editing ? 'Save Changes'
+    : `${draft.kind === 'round' ? 'Log Round' : 'Log Expense'} · ${money(tot)}`;
+
+  // Inline warnings, close to the split — real rules only (no invented
+  // "shares don't reconcile" check: uneven shares are weight-based, so
+  // they always sum correctly by construction, there's no mismatch
+  // state to detect).
+  const warn = $('#splitWarning');
+  const payerIncluded = draft.alloc.some(a => a.p === draft.payer);
+  let msg = '';
+  if(!draft.alloc.length){
+    msg = 'Choose at least one person.';
+  } else if(!payerIncluded){
+    msg = `${nameOf(draft.payer)} paid but isn't included in this split.`;
+  } else if(draft.alloc.length === 1 && tot > 0){
+    msg = `${nameOf(draft.alloc[0].p)} will cover the full ${money(tot)}.`;
+  } else if(draft.receiptUploading){
+    msg = 'Receipt is still uploading. You can log the round without it.';
+  }
+  warn.textContent = msg;
+  warn.style.display = msg ? 'block' : 'none';
+}
+
+$('#pad').innerHTML = ['1','2','3','4','5','6','7','8','9','·','0','⌫']
+  .map(k => {
+    const label = k === '·' ? 'double zero' : k === '⌫' ? 'Delete last digit' : k;
+    return `<button data-k="${k}" aria-label="${label}">${k}</button>`;
+  }).join('');
+$('#pad').querySelectorAll('button').forEach(b => b.onclick = () => {
+  const k = b.dataset.k;
+  if(k === '⌫') draft.digits = draft.digits.slice(0,-1);
+  else if(k === '·') draft.digits += '00';
+  else if(draft.digits.length < 7) draft.digits += k;
+  renderSheet();
+});
+
+// ---------- Edit Split (child sheet) ----------
+// Same draft.alloc mutations as before the restructure — only the
+// container moved. "Current Crew" is the renamed, reintroduced
+// presence-default reset (eligible()); "Everyone" and "Clear" are
+// unchanged; "Clear" is styled quiet (.link.quiet) per spec, since an
+// accidental full clear is the one genuinely dangerous action here.
+function showEditSplit(){
+  renderEditSplitSheet();
+  $('#editSplitSheet').classList.add('on');
+}
+function closeEditSplit(){ $('#editSplitSheet').classList.remove('on'); renderSheet(); }
+function renderEditSplitSheet(){
+  const at = draft.at;
+  const { headline } = splitSummaryText();
+  $('#editSplitSummary').textContent = headline;
 
   const inSplit = id => draft.alloc.some(a => a.p === id);
-  $('#splitRow').innerHTML = members.map(m => `
-    <button class="${inSplit(m.person_id)?'on':''} ${presentAt(m,at)?'':'away'}" data-split="${m.person_id}">
+  $('#editSplitRow').innerHTML = members.map(m => `
+    <button class="${inSplit(m.person_id)?'on':''} ${presentAt(m,at)?'':'away'}" data-split="${m.person_id}"
+      aria-pressed="${inSplit(m.person_id)}">
       <span class="mini" style="background:${colorFor(m.person_id)}">${initials(m.person.display_name)}</span>${m.person.display_name}</button>`).join('');
-  $('#splitRow').querySelectorAll('[data-split]').forEach(b => b.onclick = () => {
+  $('#editSplitRow').querySelectorAll('[data-split]').forEach(b => b.onclick = () => {
     const id = b.dataset.split;
     draft.alloc = inSplit(id) ? draft.alloc.filter(a => a.p !== id) : [...draft.alloc, {p:id, w:1}];
-    renderSheet();
+    renderEditSplitSheet();
   });
 
   const away = members.filter(m => !presentAt(m, at));
@@ -1045,9 +1217,10 @@ function renderSheet(){
   const bits = [];
   if(away.length) bits.push(`${away.map(m=>m.person.display_name).join(', ')} not here — excluded automatically.`);
   if(dry.length && draft.kind === 'round') bits.push(`${dry.map(m=>m.person.display_name).join(', ')} off rounds — skipped automatically.`);
-  $('#autoNote').textContent = bits.join(' ');
+  $('#editSplitAutoNote').textContent = bits.join(' ');
 
   $('#tglShares').textContent = draft.showShares ? 'Even split' : 'Uneven shares';
+  const tot = baseOf() + tipOf(), W = wSum() || 1;
   const sp = $('#sharesPanel');
   sp.style.display = draft.showShares ? 'block' : 'none';
   if(draft.showShares){
@@ -1062,43 +1235,70 @@ function renderSheet(){
     sp.querySelectorAll('[data-w]').forEach(b => b.onclick = () => {
       const a = draft.alloc.find(x => x.p === b.dataset.w);
       a.w = Math.max(1, Math.min(6, a.w + (+b.dataset.d)));
-      renderSheet();
+      renderEditSplitSheet();
     });
   }
-
-  const ok = draft.alloc.length > 0 && (draft.editing || baseOf() > 0);
-  $('#confirmBtn').disabled = !ok;
-  $('#confirmBtn').textContent = !draft.alloc.length ? "Pick who it's for"
-    : draft.editing ? `Save · ${draft.alloc.length} on it` : `Log ${money(tot)} · ${draft.alloc.length}-way`;
 }
+$('#editSplitCloseBtn').onclick = closeEditSplit;
+$('#applySplitBtn').onclick = closeEditSplit; // mutations are already immediate/committed — Apply just returns
+$('#selCurrentCrew').onclick = () => { draft.alloc = eligible(draft.kind, draft.at).map(p=>({p,w:1})); renderEditSplitSheet(); };
+$('#selAll').onclick    = () => { draft.alloc = members.map(m=>({p:m.person_id,w:1})); renderEditSplitSheet(); };
+$('#selNone').onclick   = () => { draft.alloc = []; renderEditSplitSheet(); };
+$('#tglShares').onclick = () => { if(draft.showShares) draft.alloc.forEach(a=>a.w=1); draft.showShares=!draft.showShares; renderEditSplitSheet(); };
 
-$('#pad').innerHTML = ['1','2','3','4','5','6','7','8','9','·','0','⌫']
-  .map(k => {
-    const label = k === '·' ? 'double zero' : k === '⌫' ? 'backspace' : k;
-    return `<button data-k="${k}" aria-label="${label}">${k}</button>`;
-  }).join('');
-$('#pad').querySelectorAll('button').forEach(b => b.onclick = () => {
-  const k = b.dataset.k;
-  if(k === '⌫') draft.digits = draft.digits.slice(0,-1);
-  else if(k === '·') draft.digits += '00';
-  else if(draft.digits.length < 7) draft.digits += k;
-  renderSheet();
+// ---------- Round Details (child sheet: Note + Receipt) ----------
+// Same draft.description / draft.receiptUrl mutations as before — only
+// the container moved. "Save Details" just closes, same reasoning as
+// Apply Split above.
+function showDetails(){
+  renderDetailsSheet();
+  $('#detailsSheet').classList.add('on');
+  requestAnimationFrame(() => $('#expDesc').focus());
+}
+function closeDetails(){ $('#detailsSheet').classList.remove('on'); renderSheet(); }
+function renderDetailsSheet(){
+  $('#expDesc').value = draft.description || '';
+  $('#expDesc').oninput = e => { draft.description = e.target.value; };
+
+  const rBtn = $('#receiptAttachBtn');
+  rBtn.classList.toggle('on', !!draft.receiptUrl);
+  rBtn.disabled = draft.receiptUploading;
+  rBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+    <span>${draft.receiptUploading ? 'Uploading…' : draft.receiptUrl ? 'Replace Receipt' : 'Attach Receipt'}</span>`;
+  $('#receiptRemoveBtn').style.display = (draft.receiptUrl && !draft.receiptUploading) ? 'block' : 'none';
+  $('#receiptError').textContent = draft.receiptError || '';
+  $('#receiptError').style.display = draft.receiptError ? 'block' : 'none';
+}
+$('#detailsCloseBtn').onclick = closeDetails;
+$('#saveDetailsBtn').onclick = closeDetails;
+$('#expDesc').addEventListener('focus', () => {
+  setTimeout(() => $('#expDesc').scrollIntoView({
+    block: 'center', behavior: prefersReducedMotion() ? 'auto' : 'smooth'
+  }), 300); // after the keyboard animates in, not before
 });
 
-$('#selPresent').onclick = () => { draft.alloc = eligible(draft.kind, draft.at).map(p=>({p,w:1})); renderSheet(); };
-$('#selAll').onclick     = () => { draft.alloc = members.map(m=>({p:m.person_id,w:1})); renderSheet(); };
-$('#selNone').onclick    = () => { draft.alloc = []; renderSheet(); };
-$('#tglShares').onclick  = () => { if(draft.showShares) draft.alloc.forEach(a=>a.w=1); draft.showShares=!draft.showShares; renderSheet(); };
 $('#receiptAttachBtn').onclick = () => $('#receiptFile').click();
+$('#receiptRemoveBtn').onclick = () => {
+  draft.receiptUrl = null;
+  draft.receiptFileName = null;
+  draft.receiptError = null;
+  renderDetailsSheet();
+  renderSheet();
+};
 $('#receiptFile').onchange = async e => {
   const file = e.target.files[0];
   e.target.value = ''; // allow re-selecting the same file later (e.g. after removing)
   if(!file) return;
-  if(file.size > 10 * 1024 * 1024) return toast('That photo is too large (10MB max)', true);
+  if(file.size > 10 * 1024 * 1024){
+    draft.receiptError = 'That file is too large (10MB max).';
+    renderDetailsSheet();
+    return toast(draft.receiptError, true);
+  }
 
-  const rBtn = $('#receiptAttachBtn'), rLbl = $('#receiptAttachLabel');
-  rBtn.disabled = true;
-  rLbl.textContent = 'Uploading…';
+  draft.receiptUploading = true;
+  draft.receiptFileName = file.name;
+  draft.receiptError = null;
+  renderDetailsSheet();
 
   // Path is namespaced by night, not by expense — for a brand-new
   // expense we don't have an expense id yet at upload time. A random
@@ -1107,14 +1307,16 @@ $('#receiptFile').onchange = async e => {
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().slice(0, 5);
   const path = `${night.id}/${crypto.randomUUID()}.${ext}`;
   const { error: upErr } = await sb.storage.from('receipts').upload(path, file);
+  draft.receiptUploading = false;
   if(upErr){
-    rBtn.disabled = false;
-    renderSheet();
+    draft.receiptFileName = null;
+    draft.receiptError = upErr.message;
+    renderDetailsSheet();
     return toast(upErr.message, true);
   }
   const { data: pub } = sb.storage.from('receipts').getPublicUrl(path);
   draft.receiptUrl = pub.publicUrl;
-  rBtn.disabled = false;
+  renderDetailsSheet();
   renderSheet();
   toast('Receipt attached');
 };
@@ -1122,7 +1324,12 @@ $('#btnRound').onclick   = () => openAdd('round');
 $('#btnLastCallFab').onclick = () => { if(isHost()) confirmLastCall(); };
 $('#btnStop').onclick    = () => openNewStop();
 $('#cancelBtn').onclick  = close;
-$('#scrim').onclick      = () => { close(); closeStopSheet(); closeLastCallSheet(); };
+$('#sheetCloseBtn').onclick = close;
+$('#scrim').onclick      = () => {
+  if($('#editSplitSheet').classList.contains('on')) return closeEditSplit();
+  if($('#detailsSheet').classList.contains('on')) return closeDetails();
+  close(); closeStopSheet(); closeLastCallSheet();
+};
 
 function openNewStop(){
   $('#stopName').value = '';
@@ -1146,14 +1353,16 @@ $('#voidBtn').onclick = async () => {
 };
 
 $('#confirmBtn').onclick = async () => {
+  const prevLabel = $('#confirmBtn').textContent;
   $('#confirmBtn').disabled = true;
+  $('#confirmBtn').textContent = draft.editing ? 'Saving…' : 'Logging…';
 
   if(draft.editing){
     const { error: e1 } = await sb.from('expense')
       .update({ payer_id: draft.payer, description: draft.description?.trim() || null,
                  receipt_url: draft.receiptUrl || null })
       .eq('id', draft.editing);
-    if(e1){ close(); return toast(e1.message, true); }
+    if(e1){ $('#confirmBtn').disabled = false; $('#confirmBtn').textContent = prevLabel; return toast(e1.message, true); }
     await sb.from('allocation').delete().eq('expense_id', draft.editing);
     const { error: e2 } = await sb.from('allocation').insert(
       draft.alloc.map(a => ({ expense_id: draft.editing, person_id: a.p, weight: a.w })));
@@ -1172,7 +1381,7 @@ $('#confirmBtn').onclick = async () => {
     created_by: me.id
   }).select().single();
 
-  if(error){ close(); return toast(error.message, true); }
+  if(error){ $('#confirmBtn').disabled = false; $('#confirmBtn').textContent = prevLabel; return toast(error.message, true); }
 
   const { error: aerr } = await sb.from('allocation').insert(
     draft.alloc.map(a => ({ expense_id: data.id, person_id: a.p, weight: a.w })));
@@ -1242,19 +1451,46 @@ $('#btnInfo').onclick = showGuide;
 $('#hdrBrand').innerHTML = headerBrand();
 $('#hdrCompactMark').innerHTML = compactMark();
 
-// Compact bar visibility — sticky positioning is free (CSS handles it);
-// this only ever toggles a class. Hysteresis (show >90px, hide <60px)
-// so it doesn't flicker in/out right at one fixed line. Also self-resets
-// correctly on tab switches, since switching tabs already does
-// main.scrollTop = 0, which fires this same 'scroll' event.
+function setHeaderCompact(isCompact){
+  $('#siteHeader').classList.toggle('compact', isCompact);
+  $('#hdrExpanded').setAttribute('aria-hidden', String(isCompact));
+  $('#hdrCompactRow').setAttribute('aria-hidden', String(!isCompact));
+}
+
+// Tab-aware compact title — same live data as the expanded header,
+// never a placeholder. No logo mark on The Tab: the receipt already
+// carries the LAST CALL branding, so repeating it here is exactly the
+// duplication this pass exists to remove.
+function updateCompactTitle(){
+  const mark = $('#hdrCompactMark'), title = $('#hdrCompactTitle');
+  if(currentTab === 'tab'){
+    mark.style.display = 'none';
+    title.textContent = 'The Tab';
+  } else if(currentTab === 'crew'){
+    mark.style.display = 'flex';
+    const stillOut = $('#hdrOut').textContent.split(' ')[0] || '0';
+    title.textContent = `${stillOut} Still Out`;
+  } else {
+    mark.style.display = 'flex';
+    title.textContent = $('#hdrContext').style.display !== 'none'
+      ? $('#hdrContext').textContent : (night?.title ?? 'Tonight');
+  }
+}
+
+// Two-state scroll behavior — expanded while at/near the top, compact
+// once scrolled in. One listener, one shared state, hysteresis so the
+// threshold doesn't flicker. Only main scrolls (single shared container
+// across all three tabs), so this one listener covers every tab.
 {
   const mainEl = $('main');
-  const compactBar = $('#hdrCompact');
-  let compactShown = false;
+  let compact = false;
   mainEl.addEventListener('scroll', () => {
     const y = mainEl.scrollTop;
-    if(!compactShown && y > 90){ compactShown = true; compactBar.classList.add('show'); }
-    else if(compactShown && y < 60){ compactShown = false; compactBar.classList.remove('show'); }
+    if(!compact && y > 80){ compact = true; setHeaderCompact(true); }
+    // Restore only near the actual top, not on any small upward scroll —
+    // per spec, this is deliberately not "scroll up a little and it pops
+    // back open."
+    else if(compact && y <= 10){ compact = false; setHeaderCompact(false); }
   }, { passive: true });
 }
 

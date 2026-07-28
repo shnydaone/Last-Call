@@ -39,8 +39,11 @@ body{background:#120D1C;font-family:'Archivo',system-ui,sans-serif;color:var(--p
   header{padding-top:calc(20px + env(safe-area-inset-top))}
 }
 
-header{padding:20px 20px 14px;border-bottom:1px solid var(--line);
+header{border-bottom:1px solid var(--line);
   background:linear-gradient(180deg, rgba(232,163,61,.07), transparent);flex-shrink:0}
+.hdr-expanded{padding:17px 20px 12px;max-height:400px;opacity:1;overflow:hidden;
+  transition:max-height .2s ease-out,opacity .15s ease-out}
+header.compact .hdr-expanded{max-height:0;opacity:0;padding-top:0;padding-bottom:0}
 .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;
   text-transform:uppercase;color:var(--dim2);display:flex;justify-content:space-between;align-items:center}
 .eyebrow-left{display:flex;align-items:center;gap:8px;min-width:0}
@@ -63,14 +66,14 @@ header{padding:20px 20px 14px;border-bottom:1px solid var(--line);
    stays exclusive to the landing overlay and the info guide, so it isn't
    diluted by appearing on every screen). Sized down from the landing
    version via .lc-mark-sm; the wordmark is still the page's one <h1>. */
-.hdr-brand{display:flex;align-items:center;gap:13px;margin:10px 0 14px}
+.hdr-brand{display:flex;align-items:center;gap:13px;margin:9px 0 8px}
 .lc-mark-sm{width:26px;height:26px;flex-shrink:0}
 .hdr-brand-word{font-family:'Playfair Display',serif;font-weight:900;font-size:25px;
   letter-spacing:.01em;line-height:1;text-transform:uppercase;color:var(--paper)}
 .totals{display:flex;align-items:baseline}
 .tot-block{position:relative;padding:0 16px}
 .tot-block:first-child{padding-left:0}
-.tot-block+.tot-block::before{content:'';position:absolute;left:0;top:18%;bottom:18%;
+.tot-block+.tot-block::before{content:'';position:absolute;left:0;top:24%;bottom:24%;
   width:1px;background:var(--line);opacity:.6}
 .tot-big{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;color:var(--amber);
   font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -78,7 +81,7 @@ header{padding:20px 20px 14px;border-bottom:1px solid var(--line);
 .tot-sub{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--dim);
   font-variant-numeric:tabular-nums;white-space:nowrap}
 .hdr-context{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.06em;
-  text-transform:uppercase;color:var(--dim2);margin:-4px 0 12px}
+  text-transform:uppercase;color:var(--dim2);margin:-6px 0 10px}
 @media (max-width:350px){
   .tot-block+.tot-block::before{display:none}
   .tot-block{padding:0 10px}
@@ -96,31 +99,30 @@ nav button[aria-selected="true"]{color:var(--amber-hot);font-weight:700}
 nav button[aria-selected="true"]::after{background:var(--amber)}
 
 main{flex:1;overflow-y:auto;overscroll-behavior:contain;position:relative}
-/* Compact reminder bar (approach "B" from the collapsing-header discussion):
-   the real header never moves — this is a second, small, sticky bar that
-   fades in once you've scrolled a bit into a long pane, and fades out near
-   the top. Sticky, not JS-positioned — the browser handles where it sits;
-   JS only ever toggles the .show class. pointer-events:none + aria-hidden
-   because every value here is already accessible from the real header;
-   this is a convenience, not a second interactive surface. */
-.hdr-compact{position:sticky;top:0;z-index:15;pointer-events:none;height:38px;margin-bottom:-38px;
-  display:flex;align-items:center;gap:8px;padding:0 20px;
-  background:var(--ink);border-bottom:1px solid var(--line);
-  opacity:0;transform:translateY(-4px);transition:opacity .2s ease,transform .2s ease}
-.hdr-compact.show{opacity:1;transform:none}
+main::-webkit-scrollbar{width:0}
+/* Compact header row — the header's second state, toggled by adding/
+   removing .compact on the outer <header> (see the scroll-state logic
+   in app.js). Max-height + opacity transition, not display:none, so the
+   180-220ms fade actually animates rather than cutting instantly; this
+   is a one-time transition on state change, not a continuous per-scroll
+   animation. Never coexists with .hdr-expanded — exactly one is visible. */
+.hdr-compact-row{display:flex;align-items:center;gap:8px;padding:0 20px;
+  max-height:0;opacity:0;overflow:hidden;
+  transition:max-height .2s ease-out,opacity .15s ease-out .05s}
+header.compact .hdr-compact-row{max-height:56px;opacity:1;padding-top:14px;padding-bottom:14px}
 .hdr-compact-mark{flex-shrink:0;width:18px;height:18px;display:flex}
 .hdr-compact-mark svg{width:100%;height:100%}
-.hdr-compact-word{font-family:'Playfair Display',serif;font-weight:900;font-size:14px;
-  letter-spacing:.01em;text-transform:uppercase;color:var(--paper);flex-shrink:0}
-.hdr-compact-total{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:13px;
+.hdr-compact-title{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--dim);flex-shrink:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hdr-compact-total{margin-left:auto;flex-shrink:0;font-family:'IBM Plex Mono',monospace;font-size:13px;
   font-weight:600;color:var(--amber);font-variant-numeric:tabular-nums;white-space:nowrap}
-.hdr-compact-live{display:flex;align-items:center;gap:4px;font-family:'IBM Plex Mono',monospace;
-  font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--magenta);flex-shrink:0}
+.hdr-compact-live{flex-shrink:0;display:flex;align-items:center;gap:4px;font-family:'IBM Plex Mono',monospace;
+  font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--magenta)}
 .hdr-compact-live.closed{color:var(--dim2)}
 .hdr-compact-live .dot{width:5px;height:5px;border-radius:50%;background:currentColor;
   animation:pulse 2.4s ease-in-out infinite}
 .hdr-compact-live.closed .dot{animation:none}
-main::-webkit-scrollbar{width:0}
 .pane{display:none;padding:18px 20px 120px}
 .pane.on{display:block}
 
@@ -248,7 +250,7 @@ main::-webkit-scrollbar{width:0}
    vs open" state doesn't rely on a browser-default triangle alone. */
 .crew-intro{background:var(--ink2);border:1px solid var(--ink3);border-radius:var(--r-md);
   margin-bottom:16px;overflow:hidden}
-.crew-intro-summary{list-style:none;cursor:pointer;padding:13px;min-height:var(--tap-min);
+.crew-intro-summary{list-style:none;cursor:pointer;padding:13px;min-height:56px;
   display:flex;align-items:center;justify-content:space-between;gap:10px}
 .crew-intro-summary::-webkit-details-marker{display:none}
 .crew-intro-summary::after{content:'⌄';font-size:16px;color:var(--dim2);flex-shrink:0;
@@ -336,9 +338,9 @@ main::-webkit-scrollbar{width:0}
   text-overflow:ellipsis;white-space:nowrap}
 .tab-details-nums{display:flex;gap:12px;flex-shrink:0;font-family:'IBM Plex Mono',monospace;font-size:11px}
 
-.fab{position:absolute;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));
+.fab{position:absolute;left:16px;right:16px;bottom:calc(13px + env(safe-area-inset-bottom));
   z-index:20;display:flex;gap:8px;align-items:stretch}
-.fab button{border:none;cursor:pointer;border-radius:var(--r-lg);min-height:56px;padding:6px 8px;
+.fab button{border:none;cursor:pointer;border-radius:var(--r-lg);min-height:54px;padding:5px 8px;
   display:flex;align-items:center;justify-content:center;gap:6px;
   font-family:'Anton',sans-serif;letter-spacing:.04em;text-transform:uppercase;line-height:1.15;
   transition:transform .12s,opacity .12s}
@@ -360,52 +362,136 @@ main::-webkit-scrollbar{width:0}
 .scrim{position:absolute;inset:0;background:rgba(6,4,12,.75);backdrop-filter:blur(3px);z-index:30;display:none}
 .scrim.on{display:block;animation:fade .2s both}
 @keyframes fade{from{opacity:0}to{opacity:1}}
-.sheet{position:absolute;left:0;right:0;bottom:0;z-index:40;background:var(--ink2);
-  border-top:1px solid var(--line);border-radius:22px 22px 0 0;padding:18px 20px 22px;
-  transform:translateY(102%);transition:transform .3s cubic-bezier(.2,.8,.2,1);max-height:90%;overflow-y:auto}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--ink2);
+  border-top:1px solid var(--line);border-radius:22px 22px 0 0;
+  transform:translateY(102%);transition:transform .3s cubic-bezier(.2,.8,.2,1)}
 .sheet.on{transform:none}
+
+/* Small sheets — Add Stop, Last Call confirmation. Unchanged from before:
+   size-to-content, capped at 90% of the phone. */
+.sheet.sheet-compact{z-index:40;max-height:90%;padding:18px 20px 22px;overflow-y:auto}
+
+/* Big sheets — Add Round, Edit Split, Round Details. Fixed near-full-
+   screen height (not size-to-content, which is what left a gap above the
+   old sheet), real 3-row grid so the footer occupies its own reserved
+   space instead of being a scroll-away child or an absolutely-positioned
+   overlay. Stacked child sheets get a higher z-index than the parent —
+   the parent stays rendered underneath, not hidden, so its state (typed
+   digits, selections) is never lost while a child is open. */
+.sheet.sheet-full{height:92dvh;max-height:92dvh;padding:0;
+  display:grid;grid-template-rows:auto minmax(0,1fr) auto}
+.sheet.sheet-full.z2{z-index:50}
+.sheet.sheet-full:not(.z2){z-index:40}
+
+.sheet-topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:calc(12px + env(safe-area-inset-top)) 20px 12px;border-bottom:1px solid var(--ink3)}
+.sheet-topbar h2{font-family:'Anton',sans-serif;font-size:18px;letter-spacing:.03em;
+  text-transform:uppercase;margin:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sheet-close{flex-shrink:0;width:44px;height:44px;margin:-10px -10px -10px 0;background:none;border:none;
+  color:var(--dim2);font-size:26px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.sheet-close:hover{color:var(--paper)}
+
+.sheet-full .sheet-scroll{overflow-y:auto;min-height:0;padding:16px 20px}
+.sheet-full .sheet-footer{flex-shrink:0;padding:12px 20px calc(14px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--ink3)}
 .grab{width:36px;height:4px;background:var(--line);border-radius:2px;margin:0 auto 16px}
 .sheet-handle{touch-action:none;margin:-4px -4px 4px;padding:4px 4px 10px;cursor:grab}
 .sheet h2{font-family:'Anton',sans-serif;font-size:18px;letter-spacing:.03em;text-transform:uppercase;margin-bottom:3px}
 .sheet .hint{font-size:11px;color:var(--dim2);margin-bottom:16px;line-height:1.5}
 
 .amount-display{font-family:'IBM Plex Mono',monospace;font-size:36px;font-weight:600;
-  text-align:center;color:var(--amber);padding:6px 0 4px}
-.tip-toggle{display:block;margin:2px auto 12px;text-align:center}
-.tip-row{display:flex;gap:6px;justify-content:center;margin-bottom:14px;flex-wrap:wrap}
-.chip{background:var(--ink3);border:1px solid transparent;color:var(--dim);cursor:pointer;
-  border-radius:var(--r-full);padding:8px 13px;font-size:12px;font-weight:600;transition:.15s}
+  text-align:center;color:var(--amber);padding:6px 0 4px;font-variant-numeric:tabular-nums}
+
+/* Paid-by + expense-type — one compact row now, not two stacked full-
+   width elements. Payer stays the same tappable pill (same underlying
+   selection logic); "Other expense" becomes a quiet ghost action next
+   to it instead of a full-width outlined card. */
+.row-combo{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.payer-pill{display:inline-flex;align-items:center;gap:8px;background:var(--ink3);
+  border:1px solid var(--line);border-radius:var(--r-full);min-height:40px;padding:4px 14px 4px 6px;
+  color:var(--paper);cursor:pointer;font-size:13px;font-weight:600;flex-shrink:0}
+.payer-pill .chev{opacity:.6}
+.kind-switch-compact{flex-shrink:0;background:none;border:none;color:var(--dim);cursor:pointer;
+  font-size:12.5px;font-weight:600;min-height:40px;padding:0 4px;max-width:45%;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.tip-row{display:flex;gap:6px;margin-bottom:10px}
+.chip{flex:1;background:var(--ink3);border:1px solid transparent;color:var(--dim);cursor:pointer;
+  border-radius:var(--r-md);min-height:44px;padding:8px 6px;font-size:13px;font-weight:600;transition:.15s}
 .chip.on{background:rgba(232,163,61,.16);border-color:var(--amber);color:var(--amber-hot)}
+.tip-custom-input{width:100%;background:var(--ink3);border:1px solid var(--amber);border-radius:10px;
+  padding:10px 12px;color:var(--paper);font-family:'Archivo',sans-serif;font-size:16px;
+  min-height:44px;margin-bottom:10px}
+
 .desc-field{width:100%;background:var(--ink3);border:1px solid var(--line);border-radius:10px;
   padding:12px;color:var(--paper);font-family:'Archivo',sans-serif;font-size:16px;
   min-height:var(--tap-min);margin-bottom:16px;transition:border-color .15s}
 .desc-field::placeholder{color:var(--dim2)}
 .desc-field:focus{outline:none;border-color:var(--amber);box-shadow:0 0 0 3px rgba(232,163,61,.28)}
+
+/* Split summary + Details — the two rows that replace everything that
+   used to permanently occupy the main screen (full participant grid,
+   separate Note row, separate Receipt row). Both tappable, both open a
+   child sheet; both show a real completed-state summary instead of
+   staying empty/generic. */
+.split-summary-row{width:100%;background:var(--ink3);border:1px solid var(--line);
+  border-radius:var(--r-md);padding:11px 14px;margin-bottom:8px;cursor:pointer;text-align:left}
+.split-summary-main{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.split-summary-main span:first-child{font-size:13px;font-weight:600;color:var(--paper);
+  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.split-summary-row .chev{flex-shrink:0;opacity:.6}
+.split-summary-names{font-size:11.5px;color:var(--dim2);margin-top:3px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:-webkit-box;
+  -webkit-line-clamp:1;-webkit-box-orient:vertical}
+
+.details-row{width:100%;display:flex;align-items:center;gap:10px;background:none;
+  border:1px solid var(--line);border-radius:var(--r-md);min-height:var(--tap-min);
+  padding:0 12px;margin-bottom:8px;color:var(--dim);cursor:pointer;text-align:left}
+.details-row .ico{flex-shrink:0}
+.details-row-label{flex:1;font-size:13px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.details-row .chev{flex-shrink:0;opacity:.6}
+.details-row.filled{border-color:var(--teal);color:var(--teal)}
+
 .receipt-attach-btn{width:100%;background:var(--ink3);border:1px solid var(--line);border-radius:10px;
-  min-height:var(--tap-min);padding:0 14px;margin-bottom:16px;cursor:pointer;
+  min-height:var(--tap-min);padding:0 14px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;gap:8px;
   font-family:'Archivo',sans-serif;font-size:14px;font-weight:600;color:var(--dim)}
-.receipt-attach-btn .ico{font-size:16px}
 .receipt-attach-btn.on{border-color:var(--teal);color:var(--teal);background:rgba(61,217,176,.08)}
 .receipt-attach-btn:disabled{cursor:wait;opacity:.7}
 .receipt-view-img{max-width:100%;max-height:60vh;border-radius:var(--r-md);display:block}
-.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
-.pad button{background:var(--ink3);border:none;color:var(--paper);border-radius:var(--r-md);padding:16px 0;
-  font-family:'IBM Plex Mono',monospace;font-size:23px;cursor:pointer}
+
+/* Keypad — 48-52px keys per spec (was 54px in the prior pass) */
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:16px}
+.pad button{background:var(--ink3);border:none;color:var(--paper);border-radius:13px;
+  min-height:50px;font-family:'IBM Plex Mono',monospace;font-size:20px;cursor:pointer;
+  font-variant-numeric:tabular-nums}
 .pad button:active{background:var(--line)}
 
-.who{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:6px}
-.who button{border:1px solid var(--line);background:var(--ink3);color:var(--dim2);cursor:pointer;
-  border-radius:20px;padding:7px 12px 7px 8px;display:flex;align-items:center;gap:7px;
-  font-size:12px;font-weight:600;transition:.15s}
-.who button.on{background:rgba(245,239,230,.09);color:var(--paper)}
+.split-header{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:2px}
+.split-summary{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--dim);
+  white-space:nowrap;flex-shrink:0}
+.split-warning{font-size:12px;color:var(--amber-hot);line-height:1.5;margin:2px 0 10px;
+  padding:8px 10px;background:rgba(232,163,61,.08);border-radius:var(--r-sm)}
+.split-warning.error{color:var(--magenta);background:rgba(255,77,141,.08)}
+
+/* Participant/payer cards — avatar above name (not inline), a border ring
+   marks "selected" in addition to the color change, so state isn't
+   color-only. */
+.who{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.who button{border:1.5px solid var(--line);background:var(--ink3);color:var(--dim2);cursor:pointer;
+  border-radius:var(--r-md);padding:9px 8px 7px;display:flex;flex-direction:column;align-items:center;gap:5px;
+  font-size:11px;font-weight:600;transition:.15s;min-width:56px}
+.who button.on{background:rgba(245,239,230,.09);color:var(--paper);border-color:var(--paper)}
 .who button.away{opacity:.35;border-style:dashed}
-.who .mini{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;
-  font-family:'IBM Plex Mono',monospace;font-size:8px;font-weight:600;color:var(--ink);opacity:.35}
+.who .mini{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;
+  font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;color:var(--ink);opacity:.55}
 .who button.on .mini{opacity:1}
 .who-actions{display:flex;gap:10px;margin-bottom:8px;flex-wrap:wrap}
 .link{background:none;border:none;color:var(--amber);cursor:pointer;
   font-size:13px;font-weight:600;letter-spacing:.01em;padding:4px 0}
+.link.quiet{color:var(--dim2);font-weight:500;font-size:12px}
+.split-selected-summary{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--dim);
+  margin-bottom:14px}
 .auto-note{font-size:12px;color:var(--dim2);line-height:1.5;margin-bottom:14px}
 
 .shares{background:var(--ink);border:1px solid var(--ink3);border-radius:var(--r-md);padding:13px;margin-bottom:14px}

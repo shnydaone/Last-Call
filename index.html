@@ -20,20 +20,28 @@
 </head>
 <body>
 <div class="phone">
-  <header>
-    <div class="eyebrow">
-      <span class="eyebrow-left">
-        <span id="hdrTitle">—</span>
-        <button class="info-btn" id="btnInfo" aria-label="How this app works" title="How this app works">i</button>
-      </span>
-      <span class="live offline" id="liveTag"><span class="dot"></span>Connecting…</span>
+  <header id="siteHeader">
+    <div class="hdr-expanded" id="hdrExpanded">
+      <div class="eyebrow">
+        <span class="eyebrow-left">
+          <span id="hdrTitle">—</span>
+          <button class="info-btn" id="btnInfo" aria-label="How this app works" title="How this app works">i</button>
+        </span>
+        <span class="live offline" id="liveTag"><span class="dot"></span>Connecting…</span>
+      </div>
+      <div id="hdrBrand"></div>
+      <div class="hdr-context" id="hdrContext" style="display:none"></div>
+      <div class="totals">
+        <div class="tot-block"><div class="tot-lbl">Night total</div><div class="tot-big" id="hdrTotal">$0.00</div></div>
+        <div class="tot-block"><div class="tot-lbl">Your share</div><div class="tot-sub" id="hdrYou">$0.00</div></div>
+        <div class="tot-block"><div class="tot-lbl">Still out</div><div class="tot-sub" id="hdrOut">0 of 0</div></div>
+      </div>
     </div>
-    <div id="hdrBrand"></div>
-    <div class="hdr-context" id="hdrContext" style="display:none"></div>
-    <div class="totals">
-      <div class="tot-block"><div class="tot-lbl">Night total</div><div class="tot-big" id="hdrTotal">$0.00</div></div>
-      <div class="tot-block"><div class="tot-lbl">Your share</div><div class="tot-sub" id="hdrYou">$0.00</div></div>
-      <div class="tot-block"><div class="tot-lbl">Still out</div><div class="tot-sub" id="hdrOut">0 of 0</div></div>
+    <div class="hdr-compact-row" id="hdrCompactRow" aria-hidden="true">
+      <span class="hdr-compact-mark" id="hdrCompactMark"></span>
+      <span class="hdr-compact-title" id="hdrCompactTitle"></span>
+      <span class="hdr-compact-total" id="hdrCompactTotal">$0.00</span>
+      <span class="hdr-compact-live" id="hdrCompactLive"><span class="dot"></span>Live</span>
     </div>
   </header>
 
@@ -44,12 +52,6 @@
   </nav>
 
   <main>
-    <div class="hdr-compact" id="hdrCompact" aria-hidden="true">
-      <span class="hdr-compact-mark" id="hdrCompactMark"></span>
-      <span class="hdr-compact-word">Last Call</span>
-      <span class="hdr-compact-total" id="hdrCompactTotal">$0.00</span>
-      <span class="hdr-compact-live" id="hdrCompactLive"><span class="dot"></span>Live</span>
-    </div>
     <section class="pane on" id="pane-tonight" role="tabpanel" aria-labelledby="tab-tonight"></section>
     <section class="pane" id="pane-crew" role="tabpanel" aria-labelledby="tab-crew"></section>
     <section class="pane" id="pane-tab" role="tabpanel" aria-labelledby="tab-tab"></section>
@@ -64,46 +66,111 @@
   <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
   <div class="scrim" id="scrim"></div>
 
-  <div class="sheet" id="sheet">
-    <div class="sheet-handle">
-      <div class="grab"></div>
+  <div class="sheet sheet-full" id="sheet">
+    <div class="sheet-topbar">
       <h2 id="shTitle"></h2>
-      <p class="hint" id="shHint"></p>
+      <button class="sheet-close" id="sheetCloseBtn" aria-label="Close">×</button>
     </div>
-    <button class="link" id="toggleKind" style="padding:0;margin-bottom:14px"></button>
-    <div class="section-lbl">Paid by</div>
-    <div class="who" id="payerRow"></div>
-    <div class="amount-display" id="amtDisp" aria-live="polite"></div>
-    <button class="link tip-toggle" id="tipToggle" style="padding:0"></button>
-    <div class="tip-row" id="tipRow" style="display:none">
-      <button class="chip on" data-tip="0">No tip</button>
-      <button class="chip" data-tip="18">18%</button>
-      <button class="chip" data-tip="20">20%</button>
-      <button class="chip" data-tip="25">25%</button>
+    <div class="sheet-scroll">
+      <p class="hint" id="shHint" style="display:none"></p>
+
+      <div class="row-combo">
+        <span class="field-label" style="max-width:none;margin:0">Paid by</span>
+        <button class="payer-pill" id="payerPill" type="button" aria-expanded="false" style="margin-left:-4px;margin-right:auto">
+          <span class="mini" id="payerPillAvatar"></span>
+          <span id="payerPillName"></span>
+          <svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <button class="kind-switch-compact" id="toggleKind" type="button"></button>
+      </div>
+      <div class="who" id="payerRow" style="display:none"></div>
+
+      <div class="amount-display" id="amtDisp" aria-live="polite"></div>
+      <div class="tip-row" id="tipRow">
+        <button class="chip" data-tip="18">18%</button>
+        <button class="chip" data-tip="20">20%</button>
+        <button class="chip" id="tipCustomBtn" type="button">Custom</button>
+      </div>
+      <input type="number" inputmode="decimal" id="tipCustomInput" class="tip-custom-input"
+        placeholder="Custom tip %" style="display:none">
+      <div class="pad" id="pad"></div>
+
+      <button class="split-summary-row" id="splitSummaryRow" type="button">
+        <div class="split-summary-main">
+          <span id="splitSummaryHeadline"></span>
+          <svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </div>
+        <div class="split-summary-names" id="splitSummaryNames"></div>
+      </button>
+      <div class="split-warning" id="splitWarning" aria-live="polite" style="display:none"></div>
+
+      <button class="details-row" id="detailsRow" type="button">
+        <svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h4"/></svg>
+        <span class="details-row-label" id="detailsRowLabel">Add note or receipt</span>
+        <svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
     </div>
-    <div class="pad" id="pad"></div>
-    <label class="field-label" for="expDesc" style="max-width:none;margin:0 0 6px">Note (optional)</label>
-    <input id="expDesc" class="desc-field" placeholder="e.g. Margaritas at Marlowe's" maxlength="80">
-    <input type="file" id="receiptFile" accept="image/*" capture="environment" style="display:none">
-    <button class="receipt-attach-btn" id="receiptAttachBtn" type="button">
-      <span class="ico" aria-hidden="true">📷</span><span id="receiptAttachLabel">Attach Receipt</span>
-    </button>
-    <div class="section-lbl">Splitting between</div>
-    <div class="who" id="splitRow"></div>
-    <div class="auto-note" id="autoNote"></div>
-    <div class="who-actions">
-      <button class="link" id="selPresent">Who's here</button>
-      <button class="link" id="selAll">Everyone</button>
-      <button class="link" id="selNone">Clear</button>
-      <button class="link" id="tglShares">Uneven shares</button>
+
+    <div class="sheet-footer">
+      <button class="confirm" id="confirmBtn"></button>
+      <button class="danger" id="voidBtn" style="display:none">Void this expense</button>
+      <button class="cancel" id="cancelBtn">Cancel</button>
     </div>
-    <div class="shares" id="sharesPanel" style="display:none"></div>
-    <button class="confirm" id="confirmBtn"></button>
-    <button class="danger" id="voidBtn" style="display:none">Void this expense</button>
-    <button class="cancel" id="cancelBtn">Cancel</button>
   </div>
 
-  <div class="sheet" id="stopSheet" style="padding:20px 20px 24px">
+  <!-- Edit Split — child sheet. Reuses the exact same draft.alloc /
+       eligible() / uneven-share logic as before; only the container
+       moved. Mutations are still immediate (tapping a person toggles
+       them right away, same as pre-restructure) — "Apply Split" just
+       closes the sheet, it doesn't commit anything that wasn't already
+       committed, since immediate mutation was already the existing,
+       safe behavior. -->
+  <div class="sheet sheet-full z2" id="editSplitSheet">
+    <div class="sheet-topbar">
+      <h2>Edit Split</h2>
+      <button class="sheet-close" id="editSplitCloseBtn" aria-label="Close">×</button>
+    </div>
+    <div class="sheet-scroll">
+      <div class="split-selected-summary" id="editSplitSummary"></div>
+      <div class="who" id="editSplitRow"></div>
+      <div class="auto-note" id="editSplitAutoNote"></div>
+      <div class="who-actions">
+        <button class="link" id="selCurrentCrew">Current Crew</button>
+        <button class="link" id="selAll">Everyone</button>
+        <button class="link quiet" id="selNone">Clear</button>
+      </div>
+      <button class="link" id="tglShares" style="display:block;margin-top:8px">Uneven shares</button>
+      <div class="shares" id="sharesPanel" style="display:none;margin-top:10px"></div>
+    </div>
+    <div class="sheet-footer">
+      <button class="confirm" id="applySplitBtn">Apply Split</button>
+    </div>
+  </div>
+
+  <!-- Round Details — child sheet combining Note + Receipt. Same
+       draft.description / draft.receiptUrl state as before; "Save
+       Details" just closes, same reasoning as Apply Split above. -->
+  <div class="sheet sheet-full z2" id="detailsSheet">
+    <div class="sheet-topbar">
+      <h2>Round Details</h2>
+      <button class="sheet-close" id="detailsCloseBtn" aria-label="Close">×</button>
+    </div>
+    <div class="sheet-scroll">
+      <label class="field-label" for="expDesc" style="max-width:none;margin:0 0 6px">Note</label>
+      <input id="expDesc" class="desc-field" placeholder="e.g. Margaritas at Marlowe's" maxlength="80">
+
+      <div class="section-lbl">Receipt</div>
+      <input type="file" id="receiptFile" accept="image/*,application/pdf" style="display:none">
+      <button class="receipt-attach-btn" id="receiptAttachBtn" type="button" style="margin-top:8px"></button>
+      <button class="link" id="receiptRemoveBtn" style="display:none;margin-top:8px">Remove receipt</button>
+      <p class="split-warning error" id="receiptError" role="alert" style="display:none;margin-top:8px"></p>
+    </div>
+    <div class="sheet-footer">
+      <button class="confirm" id="saveDetailsBtn">Save Details</button>
+    </div>
+  </div>
+
+  <div class="sheet sheet-compact" id="stopSheet">
     <div class="sheet-handle">
       <div class="grab"></div>
       <h2>We moved</h2>
@@ -116,7 +183,7 @@
     <button class="cancel" id="stopCancel">Cancel</button>
   </div>
 
-  <div class="sheet" id="lastCallSheet" style="padding:20px 20px 22px">
+  <div class="sheet sheet-compact" id="lastCallSheet">
     <div class="sheet-handle">
       <div class="grab"></div>
       <h2>Last Call?</h2>

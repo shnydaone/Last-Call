@@ -57,8 +57,11 @@ body{background:#120D1C;font-family:'Archivo',system-ui,sans-serif;color:var(--p
   header{padding-top:calc(20px + env(safe-area-inset-top))}
 }
 
-header{padding:20px 20px 14px;border-bottom:1px solid var(--line);
+header{border-bottom:1px solid var(--line);
   background:linear-gradient(180deg, rgba(232,163,61,.07), transparent);flex-shrink:0}
+.hdr-expanded{padding:17px 20px 12px;max-height:400px;opacity:1;overflow:hidden;
+  transition:max-height .2s ease-out,opacity .15s ease-out}
+header.compact .hdr-expanded{max-height:0;opacity:0;padding-top:0;padding-bottom:0}
 .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;
   text-transform:uppercase;color:var(--dim2);display:flex;justify-content:space-between;align-items:center}
 .eyebrow-left{display:flex;align-items:center;gap:8px;min-width:0}
@@ -81,14 +84,14 @@ header{padding:20px 20px 14px;border-bottom:1px solid var(--line);
    stays exclusive to the landing overlay and the info guide, so it isn't
    diluted by appearing on every screen). Sized down from the landing
    version via .lc-mark-sm; the wordmark is still the page's one <h1>. */
-.hdr-brand{display:flex;align-items:center;gap:13px;margin:10px 0 14px}
+.hdr-brand{display:flex;align-items:center;gap:13px;margin:9px 0 8px}
 .lc-mark-sm{width:26px;height:26px;flex-shrink:0}
 .hdr-brand-word{font-family:'Playfair Display',serif;font-weight:900;font-size:25px;
   letter-spacing:.01em;line-height:1;text-transform:uppercase;color:var(--paper)}
 .totals{display:flex;align-items:baseline}
 .tot-block{position:relative;padding:0 16px}
 .tot-block:first-child{padding-left:0}
-.tot-block+.tot-block::before{content:'';position:absolute;left:0;top:18%;bottom:18%;
+.tot-block+.tot-block::before{content:'';position:absolute;left:0;top:24%;bottom:24%;
   width:1px;background:var(--line);opacity:.6}
 .tot-big{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;color:var(--amber);
   font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -96,7 +99,7 @@ header{padding:20px 20px 14px;border-bottom:1px solid var(--line);
 .tot-sub{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--dim);
   font-variant-numeric:tabular-nums;white-space:nowrap}
 .hdr-context{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.06em;
-  text-transform:uppercase;color:var(--dim2);margin:-4px 0 12px}
+  text-transform:uppercase;color:var(--dim2);margin:-6px 0 10px}
 @media (max-width:350px){
   .tot-block+.tot-block::before{display:none}
   .tot-block{padding:0 10px}
@@ -114,31 +117,30 @@ nav button[aria-selected="true"]{color:var(--amber-hot);font-weight:700}
 nav button[aria-selected="true"]::after{background:var(--amber)}
 
 main{flex:1;overflow-y:auto;overscroll-behavior:contain;position:relative}
-/* Compact reminder bar (approach "B" from the collapsing-header discussion):
-   the real header never moves — this is a second, small, sticky bar that
-   fades in once you've scrolled a bit into a long pane, and fades out near
-   the top. Sticky, not JS-positioned — the browser handles where it sits;
-   JS only ever toggles the .show class. pointer-events:none + aria-hidden
-   because every value here is already accessible from the real header;
-   this is a convenience, not a second interactive surface. */
-.hdr-compact{position:sticky;top:0;z-index:15;pointer-events:none;height:38px;margin-bottom:-38px;
-  display:flex;align-items:center;gap:8px;padding:0 20px;
-  background:var(--ink);border-bottom:1px solid var(--line);
-  opacity:0;transform:translateY(-4px);transition:opacity .2s ease,transform .2s ease}
-.hdr-compact.show{opacity:1;transform:none}
+main::-webkit-scrollbar{width:0}
+/* Compact header row — the header's second state, toggled by adding/
+   removing .compact on the outer <header> (see the scroll-state logic
+   in app.js). Max-height + opacity transition, not display:none, so the
+   180-220ms fade actually animates rather than cutting instantly; this
+   is a one-time transition on state change, not a continuous per-scroll
+   animation. Never coexists with .hdr-expanded — exactly one is visible. */
+.hdr-compact-row{display:flex;align-items:center;gap:8px;padding:0 20px;
+  max-height:0;opacity:0;overflow:hidden;
+  transition:max-height .2s ease-out,opacity .15s ease-out .05s}
+header.compact .hdr-compact-row{max-height:56px;opacity:1;padding-top:14px;padding-bottom:14px}
 .hdr-compact-mark{flex-shrink:0;width:18px;height:18px;display:flex}
 .hdr-compact-mark svg{width:100%;height:100%}
-.hdr-compact-word{font-family:'Playfair Display',serif;font-weight:900;font-size:14px;
-  letter-spacing:.01em;text-transform:uppercase;color:var(--paper);flex-shrink:0}
-.hdr-compact-total{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:13px;
+.hdr-compact-title{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--dim);flex-shrink:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hdr-compact-total{margin-left:auto;flex-shrink:0;font-family:'IBM Plex Mono',monospace;font-size:13px;
   font-weight:600;color:var(--amber);font-variant-numeric:tabular-nums;white-space:nowrap}
-.hdr-compact-live{display:flex;align-items:center;gap:4px;font-family:'IBM Plex Mono',monospace;
-  font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--magenta);flex-shrink:0}
+.hdr-compact-live{flex-shrink:0;display:flex;align-items:center;gap:4px;font-family:'IBM Plex Mono',monospace;
+  font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--magenta)}
 .hdr-compact-live.closed{color:var(--dim2)}
 .hdr-compact-live .dot{width:5px;height:5px;border-radius:50%;background:currentColor;
   animation:pulse 2.4s ease-in-out infinite}
 .hdr-compact-live.closed .dot{animation:none}
-main::-webkit-scrollbar{width:0}
 .pane{display:none;padding:18px 20px 120px}
 .pane.on{display:block}
 
@@ -266,7 +268,7 @@ main::-webkit-scrollbar{width:0}
    vs open" state doesn't rely on a browser-default triangle alone. */
 .crew-intro{background:var(--ink2);border:1px solid var(--ink3);border-radius:var(--r-md);
   margin-bottom:16px;overflow:hidden}
-.crew-intro-summary{list-style:none;cursor:pointer;padding:13px;min-height:var(--tap-min);
+.crew-intro-summary{list-style:none;cursor:pointer;padding:13px;min-height:56px;
   display:flex;align-items:center;justify-content:space-between;gap:10px}
 .crew-intro-summary::-webkit-details-marker{display:none}
 .crew-intro-summary::after{content:'⌄';font-size:16px;color:var(--dim2);flex-shrink:0;
@@ -354,9 +356,9 @@ main::-webkit-scrollbar{width:0}
   text-overflow:ellipsis;white-space:nowrap}
 .tab-details-nums{display:flex;gap:12px;flex-shrink:0;font-family:'IBM Plex Mono',monospace;font-size:11px}
 
-.fab{position:absolute;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));
+.fab{position:absolute;left:16px;right:16px;bottom:calc(13px + env(safe-area-inset-bottom));
   z-index:20;display:flex;gap:8px;align-items:stretch}
-.fab button{border:none;cursor:pointer;border-radius:var(--r-lg);min-height:56px;padding:6px 8px;
+.fab button{border:none;cursor:pointer;border-radius:var(--r-lg);min-height:54px;padding:5px 8px;
   display:flex;align-items:center;justify-content:center;gap:6px;
   font-family:'Anton',sans-serif;letter-spacing:.04em;text-transform:uppercase;line-height:1.15;
   transition:transform .12s,opacity .12s}
@@ -378,52 +380,136 @@ main::-webkit-scrollbar{width:0}
 .scrim{position:absolute;inset:0;background:rgba(6,4,12,.75);backdrop-filter:blur(3px);z-index:30;display:none}
 .scrim.on{display:block;animation:fade .2s both}
 @keyframes fade{from{opacity:0}to{opacity:1}}
-.sheet{position:absolute;left:0;right:0;bottom:0;z-index:40;background:var(--ink2);
-  border-top:1px solid var(--line);border-radius:22px 22px 0 0;padding:18px 20px 22px;
-  transform:translateY(102%);transition:transform .3s cubic-bezier(.2,.8,.2,1);max-height:90%;overflow-y:auto}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--ink2);
+  border-top:1px solid var(--line);border-radius:22px 22px 0 0;
+  transform:translateY(102%);transition:transform .3s cubic-bezier(.2,.8,.2,1)}
 .sheet.on{transform:none}
+
+/* Small sheets — Add Stop, Last Call confirmation. Unchanged from before:
+   size-to-content, capped at 90% of the phone. */
+.sheet.sheet-compact{z-index:40;max-height:90%;padding:18px 20px 22px;overflow-y:auto}
+
+/* Big sheets — Add Round, Edit Split, Round Details. Fixed near-full-
+   screen height (not size-to-content, which is what left a gap above the
+   old sheet), real 3-row grid so the footer occupies its own reserved
+   space instead of being a scroll-away child or an absolutely-positioned
+   overlay. Stacked child sheets get a higher z-index than the parent —
+   the parent stays rendered underneath, not hidden, so its state (typed
+   digits, selections) is never lost while a child is open. */
+.sheet.sheet-full{height:92dvh;max-height:92dvh;padding:0;
+  display:grid;grid-template-rows:auto minmax(0,1fr) auto}
+.sheet.sheet-full.z2{z-index:50}
+.sheet.sheet-full:not(.z2){z-index:40}
+
+.sheet-topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:calc(12px + env(safe-area-inset-top)) 20px 12px;border-bottom:1px solid var(--ink3)}
+.sheet-topbar h2{font-family:'Anton',sans-serif;font-size:18px;letter-spacing:.03em;
+  text-transform:uppercase;margin:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sheet-close{flex-shrink:0;width:44px;height:44px;margin:-10px -10px -10px 0;background:none;border:none;
+  color:var(--dim2);font-size:26px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.sheet-close:hover{color:var(--paper)}
+
+.sheet-full .sheet-scroll{overflow-y:auto;min-height:0;padding:16px 20px}
+.sheet-full .sheet-footer{flex-shrink:0;padding:12px 20px calc(14px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--ink3)}
 .grab{width:36px;height:4px;background:var(--line);border-radius:2px;margin:0 auto 16px}
 .sheet-handle{touch-action:none;margin:-4px -4px 4px;padding:4px 4px 10px;cursor:grab}
 .sheet h2{font-family:'Anton',sans-serif;font-size:18px;letter-spacing:.03em;text-transform:uppercase;margin-bottom:3px}
 .sheet .hint{font-size:11px;color:var(--dim2);margin-bottom:16px;line-height:1.5}
 
 .amount-display{font-family:'IBM Plex Mono',monospace;font-size:36px;font-weight:600;
-  text-align:center;color:var(--amber);padding:6px 0 4px}
-.tip-toggle{display:block;margin:2px auto 12px;text-align:center}
-.tip-row{display:flex;gap:6px;justify-content:center;margin-bottom:14px;flex-wrap:wrap}
-.chip{background:var(--ink3);border:1px solid transparent;color:var(--dim);cursor:pointer;
-  border-radius:var(--r-full);padding:8px 13px;font-size:12px;font-weight:600;transition:.15s}
+  text-align:center;color:var(--amber);padding:6px 0 4px;font-variant-numeric:tabular-nums}
+
+/* Paid-by + expense-type — one compact row now, not two stacked full-
+   width elements. Payer stays the same tappable pill (same underlying
+   selection logic); "Other expense" becomes a quiet ghost action next
+   to it instead of a full-width outlined card. */
+.row-combo{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.payer-pill{display:inline-flex;align-items:center;gap:8px;background:var(--ink3);
+  border:1px solid var(--line);border-radius:var(--r-full);min-height:40px;padding:4px 14px 4px 6px;
+  color:var(--paper);cursor:pointer;font-size:13px;font-weight:600;flex-shrink:0}
+.payer-pill .chev{opacity:.6}
+.kind-switch-compact{flex-shrink:0;background:none;border:none;color:var(--dim);cursor:pointer;
+  font-size:12.5px;font-weight:600;min-height:40px;padding:0 4px;max-width:45%;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.tip-row{display:flex;gap:6px;margin-bottom:10px}
+.chip{flex:1;background:var(--ink3);border:1px solid transparent;color:var(--dim);cursor:pointer;
+  border-radius:var(--r-md);min-height:44px;padding:8px 6px;font-size:13px;font-weight:600;transition:.15s}
 .chip.on{background:rgba(232,163,61,.16);border-color:var(--amber);color:var(--amber-hot)}
+.tip-custom-input{width:100%;background:var(--ink3);border:1px solid var(--amber);border-radius:10px;
+  padding:10px 12px;color:var(--paper);font-family:'Archivo',sans-serif;font-size:16px;
+  min-height:44px;margin-bottom:10px}
+
 .desc-field{width:100%;background:var(--ink3);border:1px solid var(--line);border-radius:10px;
   padding:12px;color:var(--paper);font-family:'Archivo',sans-serif;font-size:16px;
   min-height:var(--tap-min);margin-bottom:16px;transition:border-color .15s}
 .desc-field::placeholder{color:var(--dim2)}
 .desc-field:focus{outline:none;border-color:var(--amber);box-shadow:0 0 0 3px rgba(232,163,61,.28)}
+
+/* Split summary + Details — the two rows that replace everything that
+   used to permanently occupy the main screen (full participant grid,
+   separate Note row, separate Receipt row). Both tappable, both open a
+   child sheet; both show a real completed-state summary instead of
+   staying empty/generic. */
+.split-summary-row{width:100%;background:var(--ink3);border:1px solid var(--line);
+  border-radius:var(--r-md);padding:11px 14px;margin-bottom:8px;cursor:pointer;text-align:left}
+.split-summary-main{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.split-summary-main span:first-child{font-size:13px;font-weight:600;color:var(--paper);
+  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.split-summary-row .chev{flex-shrink:0;opacity:.6}
+.split-summary-names{font-size:11.5px;color:var(--dim2);margin-top:3px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:-webkit-box;
+  -webkit-line-clamp:1;-webkit-box-orient:vertical}
+
+.details-row{width:100%;display:flex;align-items:center;gap:10px;background:none;
+  border:1px solid var(--line);border-radius:var(--r-md);min-height:var(--tap-min);
+  padding:0 12px;margin-bottom:8px;color:var(--dim);cursor:pointer;text-align:left}
+.details-row .ico{flex-shrink:0}
+.details-row-label{flex:1;font-size:13px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.details-row .chev{flex-shrink:0;opacity:.6}
+.details-row.filled{border-color:var(--teal);color:var(--teal)}
+
 .receipt-attach-btn{width:100%;background:var(--ink3);border:1px solid var(--line);border-radius:10px;
-  min-height:var(--tap-min);padding:0 14px;margin-bottom:16px;cursor:pointer;
+  min-height:var(--tap-min);padding:0 14px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;gap:8px;
   font-family:'Archivo',sans-serif;font-size:14px;font-weight:600;color:var(--dim)}
-.receipt-attach-btn .ico{font-size:16px}
 .receipt-attach-btn.on{border-color:var(--teal);color:var(--teal);background:rgba(61,217,176,.08)}
 .receipt-attach-btn:disabled{cursor:wait;opacity:.7}
 .receipt-view-img{max-width:100%;max-height:60vh;border-radius:var(--r-md);display:block}
-.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
-.pad button{background:var(--ink3);border:none;color:var(--paper);border-radius:var(--r-md);padding:16px 0;
-  font-family:'IBM Plex Mono',monospace;font-size:23px;cursor:pointer}
+
+/* Keypad — 48-52px keys per spec (was 54px in the prior pass) */
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:16px}
+.pad button{background:var(--ink3);border:none;color:var(--paper);border-radius:13px;
+  min-height:50px;font-family:'IBM Plex Mono',monospace;font-size:20px;cursor:pointer;
+  font-variant-numeric:tabular-nums}
 .pad button:active{background:var(--line)}
 
-.who{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:6px}
-.who button{border:1px solid var(--line);background:var(--ink3);color:var(--dim2);cursor:pointer;
-  border-radius:20px;padding:7px 12px 7px 8px;display:flex;align-items:center;gap:7px;
-  font-size:12px;font-weight:600;transition:.15s}
-.who button.on{background:rgba(245,239,230,.09);color:var(--paper)}
+.split-header{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:2px}
+.split-summary{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--dim);
+  white-space:nowrap;flex-shrink:0}
+.split-warning{font-size:12px;color:var(--amber-hot);line-height:1.5;margin:2px 0 10px;
+  padding:8px 10px;background:rgba(232,163,61,.08);border-radius:var(--r-sm)}
+.split-warning.error{color:var(--magenta);background:rgba(255,77,141,.08)}
+
+/* Participant/payer cards — avatar above name (not inline), a border ring
+   marks "selected" in addition to the color change, so state isn't
+   color-only. */
+.who{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.who button{border:1.5px solid var(--line);background:var(--ink3);color:var(--dim2);cursor:pointer;
+  border-radius:var(--r-md);padding:9px 8px 7px;display:flex;flex-direction:column;align-items:center;gap:5px;
+  font-size:11px;font-weight:600;transition:.15s;min-width:56px}
+.who button.on{background:rgba(245,239,230,.09);color:var(--paper);border-color:var(--paper)}
 .who button.away{opacity:.35;border-style:dashed}
-.who .mini{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;
-  font-family:'IBM Plex Mono',monospace;font-size:8px;font-weight:600;color:var(--ink);opacity:.35}
+.who .mini{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;
+  font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;color:var(--ink);opacity:.55}
 .who button.on .mini{opacity:1}
 .who-actions{display:flex;gap:10px;margin-bottom:8px;flex-wrap:wrap}
 .link{background:none;border:none;color:var(--amber);cursor:pointer;
   font-size:13px;font-weight:600;letter-spacing:.01em;padding:4px 0}
+.link.quiet{color:var(--dim2);font-weight:500;font-size:12px}
+.split-selected-summary{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--dim);
+  margin-bottom:14px}
 .auto-note{font-size:12px;color:var(--dim2);line-height:1.5;margin-bottom:14px}
 
 .shares{background:var(--ink);border:1px solid var(--ink3);border-radius:var(--r-md);padding:13px;margin-bottom:14px}
@@ -528,20 +614,28 @@ main::-webkit-scrollbar{width:0}
 </head>
 <body>
 <div class="phone">
-  <header>
-    <div class="eyebrow">
-      <span class="eyebrow-left">
-        <span id="hdrTitle">—</span>
-        <button class="info-btn" id="btnInfo" aria-label="How this app works" title="How this app works">i</button>
-      </span>
-      <span class="live offline" id="liveTag"><span class="dot"></span>Connecting…</span>
+  <header id="siteHeader">
+    <div class="hdr-expanded" id="hdrExpanded">
+      <div class="eyebrow">
+        <span class="eyebrow-left">
+          <span id="hdrTitle">—</span>
+          <button class="info-btn" id="btnInfo" aria-label="How this app works" title="How this app works">i</button>
+        </span>
+        <span class="live offline" id="liveTag"><span class="dot"></span>Connecting…</span>
+      </div>
+      <div id="hdrBrand"></div>
+      <div class="hdr-context" id="hdrContext" style="display:none"></div>
+      <div class="totals">
+        <div class="tot-block"><div class="tot-lbl">Night total</div><div class="tot-big" id="hdrTotal">$0.00</div></div>
+        <div class="tot-block"><div class="tot-lbl">Your share</div><div class="tot-sub" id="hdrYou">$0.00</div></div>
+        <div class="tot-block"><div class="tot-lbl">Still out</div><div class="tot-sub" id="hdrOut">0 of 0</div></div>
+      </div>
     </div>
-    <div id="hdrBrand"></div>
-    <div class="hdr-context" id="hdrContext" style="display:none"></div>
-    <div class="totals">
-      <div class="tot-block"><div class="tot-lbl">Night total</div><div class="tot-big" id="hdrTotal">$0.00</div></div>
-      <div class="tot-block"><div class="tot-lbl">Your share</div><div class="tot-sub" id="hdrYou">$0.00</div></div>
-      <div class="tot-block"><div class="tot-lbl">Still out</div><div class="tot-sub" id="hdrOut">0 of 0</div></div>
+    <div class="hdr-compact-row" id="hdrCompactRow" aria-hidden="true">
+      <span class="hdr-compact-mark" id="hdrCompactMark"></span>
+      <span class="hdr-compact-title" id="hdrCompactTitle"></span>
+      <span class="hdr-compact-total" id="hdrCompactTotal">$0.00</span>
+      <span class="hdr-compact-live" id="hdrCompactLive"><span class="dot"></span>Live</span>
     </div>
   </header>
 
@@ -552,12 +646,6 @@ main::-webkit-scrollbar{width:0}
   </nav>
 
   <main>
-    <div class="hdr-compact" id="hdrCompact" aria-hidden="true">
-      <span class="hdr-compact-mark" id="hdrCompactMark"></span>
-      <span class="hdr-compact-word">Last Call</span>
-      <span class="hdr-compact-total" id="hdrCompactTotal">$0.00</span>
-      <span class="hdr-compact-live" id="hdrCompactLive"><span class="dot"></span>Live</span>
-    </div>
     <section class="pane on" id="pane-tonight" role="tabpanel" aria-labelledby="tab-tonight"></section>
     <section class="pane" id="pane-crew" role="tabpanel" aria-labelledby="tab-crew"></section>
     <section class="pane" id="pane-tab" role="tabpanel" aria-labelledby="tab-tab"></section>
@@ -572,46 +660,111 @@ main::-webkit-scrollbar{width:0}
   <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
   <div class="scrim" id="scrim"></div>
 
-  <div class="sheet" id="sheet">
-    <div class="sheet-handle">
-      <div class="grab"></div>
+  <div class="sheet sheet-full" id="sheet">
+    <div class="sheet-topbar">
       <h2 id="shTitle"></h2>
-      <p class="hint" id="shHint"></p>
+      <button class="sheet-close" id="sheetCloseBtn" aria-label="Close">×</button>
     </div>
-    <button class="link" id="toggleKind" style="padding:0;margin-bottom:14px"></button>
-    <div class="section-lbl">Paid by</div>
-    <div class="who" id="payerRow"></div>
-    <div class="amount-display" id="amtDisp" aria-live="polite"></div>
-    <button class="link tip-toggle" id="tipToggle" style="padding:0"></button>
-    <div class="tip-row" id="tipRow" style="display:none">
-      <button class="chip on" data-tip="0">No tip</button>
-      <button class="chip" data-tip="18">18%</button>
-      <button class="chip" data-tip="20">20%</button>
-      <button class="chip" data-tip="25">25%</button>
+    <div class="sheet-scroll">
+      <p class="hint" id="shHint" style="display:none"></p>
+
+      <div class="row-combo">
+        <span class="field-label" style="max-width:none;margin:0">Paid by</span>
+        <button class="payer-pill" id="payerPill" type="button" aria-expanded="false" style="margin-left:-4px;margin-right:auto">
+          <span class="mini" id="payerPillAvatar"></span>
+          <span id="payerPillName"></span>
+          <svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <button class="kind-switch-compact" id="toggleKind" type="button"></button>
+      </div>
+      <div class="who" id="payerRow" style="display:none"></div>
+
+      <div class="amount-display" id="amtDisp" aria-live="polite"></div>
+      <div class="tip-row" id="tipRow">
+        <button class="chip" data-tip="18">18%</button>
+        <button class="chip" data-tip="20">20%</button>
+        <button class="chip" id="tipCustomBtn" type="button">Custom</button>
+      </div>
+      <input type="number" inputmode="decimal" id="tipCustomInput" class="tip-custom-input"
+        placeholder="Custom tip %" style="display:none">
+      <div class="pad" id="pad"></div>
+
+      <button class="split-summary-row" id="splitSummaryRow" type="button">
+        <div class="split-summary-main">
+          <span id="splitSummaryHeadline"></span>
+          <svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </div>
+        <div class="split-summary-names" id="splitSummaryNames"></div>
+      </button>
+      <div class="split-warning" id="splitWarning" aria-live="polite" style="display:none"></div>
+
+      <button class="details-row" id="detailsRow" type="button">
+        <svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h4"/></svg>
+        <span class="details-row-label" id="detailsRowLabel">Add note or receipt</span>
+        <svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
     </div>
-    <div class="pad" id="pad"></div>
-    <label class="field-label" for="expDesc" style="max-width:none;margin:0 0 6px">Note (optional)</label>
-    <input id="expDesc" class="desc-field" placeholder="e.g. Margaritas at Marlowe's" maxlength="80">
-    <input type="file" id="receiptFile" accept="image/*" capture="environment" style="display:none">
-    <button class="receipt-attach-btn" id="receiptAttachBtn" type="button">
-      <span class="ico" aria-hidden="true">📷</span><span id="receiptAttachLabel">Attach Receipt</span>
-    </button>
-    <div class="section-lbl">Splitting between</div>
-    <div class="who" id="splitRow"></div>
-    <div class="auto-note" id="autoNote"></div>
-    <div class="who-actions">
-      <button class="link" id="selPresent">Who's here</button>
-      <button class="link" id="selAll">Everyone</button>
-      <button class="link" id="selNone">Clear</button>
-      <button class="link" id="tglShares">Uneven shares</button>
+
+    <div class="sheet-footer">
+      <button class="confirm" id="confirmBtn"></button>
+      <button class="danger" id="voidBtn" style="display:none">Void this expense</button>
+      <button class="cancel" id="cancelBtn">Cancel</button>
     </div>
-    <div class="shares" id="sharesPanel" style="display:none"></div>
-    <button class="confirm" id="confirmBtn"></button>
-    <button class="danger" id="voidBtn" style="display:none">Void this expense</button>
-    <button class="cancel" id="cancelBtn">Cancel</button>
   </div>
 
-  <div class="sheet" id="stopSheet" style="padding:20px 20px 24px">
+  <!-- Edit Split — child sheet. Reuses the exact same draft.alloc /
+       eligible() / uneven-share logic as before; only the container
+       moved. Mutations are still immediate (tapping a person toggles
+       them right away, same as pre-restructure) — "Apply Split" just
+       closes the sheet, it doesn't commit anything that wasn't already
+       committed, since immediate mutation was already the existing,
+       safe behavior. -->
+  <div class="sheet sheet-full z2" id="editSplitSheet">
+    <div class="sheet-topbar">
+      <h2>Edit Split</h2>
+      <button class="sheet-close" id="editSplitCloseBtn" aria-label="Close">×</button>
+    </div>
+    <div class="sheet-scroll">
+      <div class="split-selected-summary" id="editSplitSummary"></div>
+      <div class="who" id="editSplitRow"></div>
+      <div class="auto-note" id="editSplitAutoNote"></div>
+      <div class="who-actions">
+        <button class="link" id="selCurrentCrew">Current Crew</button>
+        <button class="link" id="selAll">Everyone</button>
+        <button class="link quiet" id="selNone">Clear</button>
+      </div>
+      <button class="link" id="tglShares" style="display:block;margin-top:8px">Uneven shares</button>
+      <div class="shares" id="sharesPanel" style="display:none;margin-top:10px"></div>
+    </div>
+    <div class="sheet-footer">
+      <button class="confirm" id="applySplitBtn">Apply Split</button>
+    </div>
+  </div>
+
+  <!-- Round Details — child sheet combining Note + Receipt. Same
+       draft.description / draft.receiptUrl state as before; "Save
+       Details" just closes, same reasoning as Apply Split above. -->
+  <div class="sheet sheet-full z2" id="detailsSheet">
+    <div class="sheet-topbar">
+      <h2>Round Details</h2>
+      <button class="sheet-close" id="detailsCloseBtn" aria-label="Close">×</button>
+    </div>
+    <div class="sheet-scroll">
+      <label class="field-label" for="expDesc" style="max-width:none;margin:0 0 6px">Note</label>
+      <input id="expDesc" class="desc-field" placeholder="e.g. Margaritas at Marlowe's" maxlength="80">
+
+      <div class="section-lbl">Receipt</div>
+      <input type="file" id="receiptFile" accept="image/*,application/pdf" style="display:none">
+      <button class="receipt-attach-btn" id="receiptAttachBtn" type="button" style="margin-top:8px"></button>
+      <button class="link" id="receiptRemoveBtn" style="display:none;margin-top:8px">Remove receipt</button>
+      <p class="split-warning error" id="receiptError" role="alert" style="display:none;margin-top:8px"></p>
+    </div>
+    <div class="sheet-footer">
+      <button class="confirm" id="saveDetailsBtn">Save Details</button>
+    </div>
+  </div>
+
+  <div class="sheet sheet-compact" id="stopSheet">
     <div class="sheet-handle">
       <div class="grab"></div>
       <h2>We moved</h2>
@@ -624,7 +777,7 @@ main::-webkit-scrollbar{width:0}
     <button class="cancel" id="stopCancel">Cancel</button>
   </div>
 
-  <div class="sheet" id="lastCallSheet" style="padding:20px 20px 22px">
+  <div class="sheet sheet-compact" id="lastCallSheet">
     <div class="sheet-handle">
       <div class="grab"></div>
       <h2>Last Call?</h2>
@@ -1140,6 +1293,8 @@ function refresh(){
    ============================================================ */
 const avatar = id => `<div class="av" style="background:${colorFor(id)}">${initials(nameOf(id))}</div>`;
 
+let currentTab = 'tonight';
+
 function renderHeader(){
   if(!night) return;
   const now = new Date();
@@ -1154,15 +1309,16 @@ function renderHeader(){
   $('#hdrTotal').textContent = money(grand);
   $('#hdrYou').textContent   = money(mine?.owed_cents ?? 0);
   $('#hdrOut').textContent   = `${activeCount} of ${members.length}`;
-  $('#fab').style.display    = isOpen() ? 'flex' : 'none';
+  updateFabVisibility();
 
-  // Compact reminder bar — same grand total, same open/closed state, no
-  // second source of truth. Text content only; visibility is driven
-  // purely by scroll position (see the listener set up once, below).
+  // Compact row — same grand/isOpen(), no second source of truth. Text
+  // content only; visibility is driven purely by scroll state (see the
+  // header-state logic near boot(), below).
   $('#hdrCompactTotal').textContent = money(grand);
   const compactLive = $('#hdrCompactLive');
   compactLive.className = 'hdr-compact-live' + (isOpen() ? '' : ' closed');
   compactLive.innerHTML = `<span class="dot"></span>${isOpen() ? 'Live' : 'Closed'}`;
+  updateCompactTitle();
 
   // Optional one-line orientation ("STOP 2 · 3 ROUNDS") — only shown once
   // a stop genuinely exists, using data already fetched for the Tonight
@@ -1239,9 +1395,9 @@ function renderTonight(){
           <div class="exp-amt-col">
             <div class="exp-amt">${money(totalOf(e))}</div>
             <button class="receipt-btn ${e.receipt_url?'on':''}" data-receipt="${e.receipt_url?e.id:''}"
-              aria-label="${e.receipt_url ? 'View attached receipt photo' : 'No receipt attached'}"
+              aria-label="${e.receipt_url ? 'View attached receipt' : 'No receipt attached'}"
               title="${e.receipt_url ? 'View receipt' : 'No receipt attached'}">
-              <span aria-hidden="true">📷</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
             </button>
           </div>
           <button class="flag ${e.status==='disputed'?'on':''}" data-flag="${e.id}"
@@ -1291,9 +1447,13 @@ function renderTonight(){
 // one used for Connecting/Join/the info guide), no new modal machinery.
 function viewReceipt(url){
   overlay('Receipt', '');
-  $('#ovBody').innerHTML = `
-    <img src="${url}" alt="Receipt photo" class="receipt-view-img">
-    <button id="receiptViewClose" style="margin-top:14px">Close</button>`;
+  const isImage = /\.(jpe?g|png|gif|webp|heic|heif)(\?|$)/i.test(url);
+  $('#ovBody').innerHTML = isImage
+    ? `<img src="${url}" alt="Receipt photo" class="receipt-view-img">
+       <button id="receiptViewClose" style="margin-top:14px">Close</button>`
+    : `<p class="hint" style="margin-bottom:14px">This receipt is a file, not a photo — open it to view it.</p>
+       <a class="confirm" href="${url}" target="_blank" rel="noopener" style="display:block;text-decoration:none;text-align:center">Open Receipt</a>
+       <button id="receiptViewClose" style="margin-top:10px">Close</button>`;
   $('#receiptViewClose').onclick = hideOverlay;
 }
 
@@ -1619,11 +1779,22 @@ async function shareTabSummary(grand, collect, final){
 function renderAll(){ if(!night) return; renderHeader(); renderTonight(); renderCrew(); renderTab(); }
 
 /* ---------- tabs ---------- */
+function updateFabVisibility(){
+  $('#fab').style.display = (currentTab === 'tab' || !isOpen() || (currentTab === 'tonight' && !expenses.length))
+    ? 'none' : 'flex';
+}
+
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   document.querySelectorAll('nav button').forEach(x => x.setAttribute('aria-selected', x === b));
   document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'pane-' + b.dataset.tab));
-  $('#fab').style.display = (b.dataset.tab === 'tab' || !isOpen()) ? 'none' : 'flex';
+  currentTab = b.dataset.tab;
+  updateFabVisibility();
   $('main').scrollTop = 0;
+  // scrollTop = 0 is a no-op (fires no 'scroll' event) if already at 0 —
+  // switching tabs must always land on the expanded state regardless,
+  // so this is set directly rather than relying on the scroll listener.
+  setHeaderCompact(false);
+  updateCompactTitle();
 });
 const goTab = n => document.querySelector(`nav button[data-tab="${n}"]`).click();
 
@@ -1670,8 +1841,7 @@ let draft = null;
 const baseOf = () => draft.editing ? draft.base : parseInt(draft.digits || '0', 10);
 const tipOf  = () => {
   if(draft.editing) return draft.fixedTip;
-  if(!draft.tipMode) return 0;
-  return Math.round(baseOf() * draft.tip / 100);
+  return draft.tip ? Math.round(baseOf() * draft.tip / 100) : 0;
 };
 const wSum = () => draft.alloc.reduce((s,a)=>s+a.w, 0);
 
@@ -1680,22 +1850,24 @@ function eligible(kind, at){
 }
 
 function applyKindLabels(){
-  $('#shTitle').textContent = draft.kind === 'round' ? "Who's buying?" : 'Log an expense';
-  $('#shHint').textContent  = draft.kind === 'round'
-    ? 'Split defaults to whoever is out right now, minus anyone off rounds.'
-    : "Cover, cab, coat check, cash tip — anything that isn't a round.";
-  $('#toggleKind').textContent = draft.kind === 'round'
-    ? 'Not a round? Log something else instead'
-    : 'Actually, this is a round';
+  $('#shTitle').textContent = draft.kind === 'round' ? 'Add Round' : 'Add Expense';
+  // No permanent helper paragraph — "Split a round to keep things fair"
+  // was exactly the boilerplate this pass asked to remove from a
+  // repeated action. Hidden entirely for add-mode; openEdit() below
+  // still uses #shHint for one-time context about the specific expense
+  // being edited, which is genuinely per-instance info, not boilerplate.
+  $('#shHint').style.display = 'none';
+  $('#toggleKind').textContent = draft.kind === 'round' ? 'Other expense' : 'Log a round instead';
 }
 
 function openAdd(kind){
   const at = new Date();
-  draft = { editing:null, kind, payer: me.id, digits:'', tip: 0, tipMode:false, description:'',
-            receiptUrl: null,
+  draft = { editing:null, kind, payer: me.id, digits:'', tip: 0, description:'',
+            receiptUrl: null, receiptFileName: null, receiptUploading: false, receiptError: null,
+            payerOpen: false, tipCustomOpen: false,
             showShares:false, at, alloc: eligible(kind, at).map(p => ({p, w:1})) };
   applyKindLabels();
-  $('#toggleKind').style.display = 'block';
+  $('#toggleKind').style.display = 'inline-block';
   $('#pad').style.display = 'grid';
   $('#voidBtn').style.display = 'none';
   show();
@@ -1704,11 +1876,16 @@ function openEdit(id){
   if(!isOpen()) return toast('Tab is closed', true);
   const e = expenses.find(x => x.id === id);
   draft = { editing:id, kind:e.kind, payer:e.payer_id, base:e.base_cents, fixedTip:e.tip_cents,
-            description: e.description || '', receiptUrl: e.receipt_url || null,
+            description: e.description || '', receiptUrl: e.receipt_url || null, receiptFileName: null,
+            receiptUploading: false, receiptError: null, payerOpen: false, tipCustomOpen: false,
             showShares: e.allocation.some(a => Number(a.weight) !== 1), at: new Date(e.occurred_at),
             alloc: e.allocation.map(a => ({ p:a.person_id, w:Number(a.weight) })) };
   $('#shTitle').textContent = 'Edit expense';
+  // Editing is a one-off action on a specific, already-existing expense —
+  // this context line is genuinely new information each time, not a
+  // repeated boilerplate explanation, so it stays visible here.
   $('#shHint').textContent = `${e.note ?? 'Expense'}${e.description ? ' — ' + e.description : ''} · logged ${clock(e.occurred_at)}. Drop someone out or give them a bigger share.`;
+  $('#shHint').style.display = 'block';
   $('#toggleKind').style.display = 'none';
   $('#pad').style.display = 'none';
   $('#voidBtn').style.display = 'block';
@@ -1721,7 +1898,12 @@ $('#toggleKind').onclick = () => {
   renderSheet();
 };
 function show(){ renderSheet(); $('#scrim').classList.add('on'); $('#sheet').classList.add('on'); }
-function close(){ $('#scrim').classList.remove('on'); $('#sheet').classList.remove('on'); }
+function close(){
+  $('#scrim').classList.remove('on'); $('#sheet').classList.remove('on');
+  // Abandoning the whole flow closes any child sheet left open too.
+  $('#editSplitSheet').classList.remove('on');
+  $('#detailsSheet').classList.remove('on');
+}
 
 // Drag-to-dismiss, from the header zone (handle/title/hint) only —
 // not the interactive body — so it doesn't hijack typing or tapping
@@ -1758,57 +1940,200 @@ function makeSwipeToClose(sheetEl, closeFn){
   handle.addEventListener('pointerup', release);
   handle.addEventListener('pointercancel', release);
 }
-makeSwipeToClose($('#sheet'), close);
 makeSwipeToClose($('#stopSheet'), closeStopSheet);
+// Big sheets (Add Round + its two children) use an explicit × close
+// button instead of swipe-to-dismiss, matching the near-full-screen
+// header pattern — no makeSwipeToClose() call for these three.
 
 function renderSheet(){
   const at = draft.at;
-  $('#payerRow').innerHTML = members.map(m => `
-    <button class="${draft.payer===m.person_id?'on':''} ${presentAt(m,at)?'':'away'}" data-payer="${m.person_id}">
-      <span class="mini" style="background:${colorFor(m.person_id)}">${initials(m.person.display_name)}</span>${m.person.display_name}</button>`).join('');
-  $('#payerRow').querySelectorAll('[data-payer]').forEach(b => b.onclick = () => { draft.payer = b.dataset.payer; renderSheet(); });
 
-  const tot = baseOf() + tipOf(), W = wSum() || 1;
-  const sub = draft.tipMode
-    ? `${money(baseOf())} + ${money(tipOf())} tip${draft.alloc.length?` · ${money(Math.round(tot/W))}/share`:''}`
-    : (draft.alloc.length ? `${money(Math.round(tot/W))}/share` : 'total');
-  $('#amtDisp').innerHTML = tot
-    ? `${money(tot)}<span style="font-size:12px;color:var(--dim2);display:block;margin-top:2px">${sub}</span>`
-    : `$0.00<span style="font-size:12px;color:var(--dim2);display:block;margin-top:2px">tap the keypad</span>`;
-
-  // Total-first by default — most people just know what they paid.
-  // The tip calculator is opt-in for anyone who'd rather work from a
-  // subtotal + tip%; switching modes clears the digits so a typed
-  // total is never silently reinterpreted as a subtotal (or vice versa).
-  $('#tipToggle').style.display = draft.editing ? 'none' : 'block';
-  $('#tipToggle').textContent = draft.tipMode ? 'Enter total directly' : '+ Calculate a tip';
-  $('#tipToggle').onclick = () => {
-    draft.tipMode = !draft.tipMode;
-    draft.digits = '';
-    draft.tip = 0;
+  // Paid-by — collapsed pill showing the current payer; tapping it
+  // reveals the same selection row used before (unchanged click logic),
+  // and picking someone auto-collapses it back down.
+  const payer = M(draft.payer);
+  $('#payerPillAvatar').style.background = colorFor(draft.payer);
+  $('#payerPillAvatar').textContent = initials(payer?.person?.display_name);
+  $('#payerPillName').textContent = payer?.person?.display_name ?? '—';
+  $('#payerPill').setAttribute('aria-expanded', String(draft.payerOpen));
+  $('#payerPill').onclick = () => {
+    draft.payerOpen = !draft.payerOpen;
     renderSheet();
+    if(draft.payerOpen) requestAnimationFrame(() =>
+      ($('#payerRow').querySelector('[data-payer].on') || $('#payerRow').querySelector('[data-payer]'))?.focus());
   };
-  $('#tipRow').style.display = (!draft.editing && draft.tipMode) ? 'flex' : 'none';
-  $('#tipRow').querySelectorAll('.chip').forEach(c => {
-    c.classList.toggle('on', String(draft.tip) === c.dataset.tip);
-    c.onclick = () => { draft.tip = +c.dataset.tip; renderSheet(); };
+  $('#payerRow').style.display = draft.payerOpen ? 'flex' : 'none';
+  $('#payerRow').innerHTML = members.map(m => `
+    <button class="${draft.payer===m.person_id?'on':''} ${presentAt(m,at)?'':'away'}" data-payer="${m.person_id}"
+      aria-pressed="${draft.payer===m.person_id}">
+      <span class="mini" style="background:${colorFor(m.person_id)}">${initials(m.person.display_name)}</span>${m.person.display_name}</button>`).join('');
+  $('#payerRow').querySelectorAll('[data-payer]').forEach(b => b.onclick = () => {
+    draft.payer = b.dataset.payer;
+    draft.payerOpen = false;
+    renderSheet();
   });
 
-  $('#expDesc').value = draft.description || '';
-  $('#expDesc').oninput = e => { draft.description = e.target.value; };
+  // Amount — tip presets are always visible now (not opt-in). draft.tip
+  // is 0 until a preset or custom % is actively chosen; nothing is
+  // pre-selected. Same base*tip%/100 math as before either way.
+  const tot = baseOf() + tipOf(), W = wSum() || 1;
+  const sub = draft.tip
+    ? `${money(baseOf())} + ${money(tipOf())} tip · ${money(tot)} total`
+    : (draft.alloc.length ? `${money(Math.round(tot/W))}/person` : '');
+  // No "tap the keypad" helper at $0 anymore — the keypad being right
+  // there already makes the interaction obvious.
+  $('#amtDisp').innerHTML = tot
+    ? `${money(baseOf())}${sub ? `<span style="font-size:12px;color:var(--dim2);display:block;margin-top:2px">${sub}</span>` : ''}`
+    : `$0.00`;
 
-  const rBtn = $('#receiptAttachBtn'), rLbl = $('#receiptAttachLabel');
-  rBtn.classList.toggle('on', !!draft.receiptUrl);
-  rLbl.textContent = draft.receiptUrl ? 'Receipt attached · Tap to replace' : 'Attach Receipt';
+  $('#tipRow').style.display = draft.editing ? 'none' : 'flex';
+  $('#tipRow').querySelectorAll('.chip[data-tip]').forEach(c => {
+    const on = String(draft.tip) === c.dataset.tip;
+    c.classList.toggle('on', on);
+    c.setAttribute('aria-pressed', String(on));
+    c.onclick = () => {
+      draft.tip = (String(draft.tip) === c.dataset.tip) ? 0 : +c.dataset.tip;
+      draft.tipCustomOpen = false;
+      renderSheet();
+    };
+  });
+  const customActive = draft.tip && ![18,20].includes(draft.tip);
+  $('#tipCustomBtn').classList.toggle('on', customActive || draft.tipCustomOpen);
+  $('#tipCustomBtn').setAttribute('aria-pressed', String(customActive || draft.tipCustomOpen));
+  $('#tipCustomBtn').onclick = () => { draft.tipCustomOpen = !draft.tipCustomOpen; renderSheet(); };
+  $('#tipCustomInput').style.display = (!draft.editing && draft.tipCustomOpen) ? 'block' : 'none';
+  if(draft.tipCustomOpen && document.activeElement !== $('#tipCustomInput')){
+    $('#tipCustomInput').value = customActive ? draft.tip : '';
+  }
+  $('#tipCustomInput').oninput = e => {
+    draft.tip = Math.max(0, Math.min(100, +e.target.value || 0));
+    const t2 = baseOf() + tipOf();
+    const s2 = draft.tip ? `${money(baseOf())} + ${money(tipOf())} tip · ${money(t2)} total`
+                          : (draft.alloc.length ? `${money(Math.round(t2/(wSum()||1)))}/person` : '');
+    const subEl = $('#amtDisp').querySelector('span');
+    if(subEl) subEl.textContent = s2;
+    updateSplitSummary();
+    updateConfirmAndWarnings();
+  };
+
+  updateSplitSummary();
+
+  // Details row — one line summarizing both note and receipt state.
+  // Neither field is ever shown expanded on the main screen anymore;
+  // both live in the Round Details child sheet.
+  const hasNote = !!draft.description, hasReceipt = !!draft.receiptUrl;
+  $('#detailsRow').classList.toggle('filled', hasNote || hasReceipt);
+  $('#detailsRowLabel').textContent =
+    hasNote && hasReceipt ? 'Note + receipt added'
+    : hasNote ? 'Note added'
+    : hasReceipt ? 'Receipt attached'
+    : 'Add note or receipt';
+  $('#detailsRow').onclick = showDetails;
+
+  $('#splitSummaryRow').onclick = showEditSplit;
+
+  updateConfirmAndWarnings();
+}
+
+// Split summary — shown on the main screen and recomputed on every
+// amount/tip/participant change. Reused verbatim by the Edit Split
+// sheet's own header line.
+function splitSummaryText(){
+  const tot = baseOf() + tipOf(), W = wSum() || 1;
+  const uneven = draft.alloc.some(a => a.w !== 1);
+  const names = draft.alloc.map(a => nameOf(a.p));
+  let namesLine = '';
+  if(names.length > 4){
+    namesLine = `${names.slice(0,3).join(', ')} +${names.length-3} more`;
+  } else if(names.length === 2){
+    namesLine = names.join(' and ');
+  } else if(names.length > 2){
+    namesLine = `${names.slice(0,-1).join(', ')} and ${names[names.length-1]}`;
+  } else {
+    namesLine = names.join('');
+  }
+
+  if(!draft.alloc.length) return { headline: 'No one selected yet', names: '' };
+  if(uneven) return { headline: `Uneven split · ${draft.alloc.length} people`, names: namesLine };
+  if(!tot) return { headline: `${draft.alloc.length} people selected`, names: namesLine };
+  if(draft.alloc.length === 1) return { headline: `${names[0]} covers ${money(tot)}`, names: '' };
+  return { headline: `Split ${draft.alloc.length} ways · ${money(Math.round(tot/W))} each`, names: namesLine };
+}
+function updateSplitSummary(){
+  const { headline, names } = splitSummaryText();
+  $('#splitSummaryHeadline').textContent = headline;
+  $('#splitSummaryNames').textContent = names;
+}
+
+// Split out so the tip-custom-input's live update (which deliberately
+// skips a full renderSheet() to avoid resetting its own cursor) can
+// still keep the confirm button and warnings in sync.
+function updateConfirmAndWarnings(){
+  const tot = baseOf() + tipOf(), W = wSum() || 1;
+  const ok = draft.alloc.length > 0 && (draft.editing || baseOf() > 0);
+  $('#confirmBtn').disabled = !ok || draft.receiptUploading;
+  $('#confirmBtn').textContent = !draft.alloc.length ? "Pick who it's for"
+    : draft.editing ? 'Save Changes'
+    : `${draft.kind === 'round' ? 'Log Round' : 'Log Expense'} · ${money(tot)}`;
+
+  // Inline warnings, close to the split — real rules only (no invented
+  // "shares don't reconcile" check: uneven shares are weight-based, so
+  // they always sum correctly by construction, there's no mismatch
+  // state to detect).
+  const warn = $('#splitWarning');
+  const payerIncluded = draft.alloc.some(a => a.p === draft.payer);
+  let msg = '';
+  if(!draft.alloc.length){
+    msg = 'Choose at least one person.';
+  } else if(!payerIncluded){
+    msg = `${nameOf(draft.payer)} paid but isn't included in this split.`;
+  } else if(draft.alloc.length === 1 && tot > 0){
+    msg = `${nameOf(draft.alloc[0].p)} will cover the full ${money(tot)}.`;
+  } else if(draft.receiptUploading){
+    msg = 'Receipt is still uploading. You can log the round without it.';
+  }
+  warn.textContent = msg;
+  warn.style.display = msg ? 'block' : 'none';
+}
+
+$('#pad').innerHTML = ['1','2','3','4','5','6','7','8','9','·','0','⌫']
+  .map(k => {
+    const label = k === '·' ? 'double zero' : k === '⌫' ? 'Delete last digit' : k;
+    return `<button data-k="${k}" aria-label="${label}">${k}</button>`;
+  }).join('');
+$('#pad').querySelectorAll('button').forEach(b => b.onclick = () => {
+  const k = b.dataset.k;
+  if(k === '⌫') draft.digits = draft.digits.slice(0,-1);
+  else if(k === '·') draft.digits += '00';
+  else if(draft.digits.length < 7) draft.digits += k;
+  renderSheet();
+});
+
+// ---------- Edit Split (child sheet) ----------
+// Same draft.alloc mutations as before the restructure — only the
+// container moved. "Current Crew" is the renamed, reintroduced
+// presence-default reset (eligible()); "Everyone" and "Clear" are
+// unchanged; "Clear" is styled quiet (.link.quiet) per spec, since an
+// accidental full clear is the one genuinely dangerous action here.
+function showEditSplit(){
+  renderEditSplitSheet();
+  $('#editSplitSheet').classList.add('on');
+}
+function closeEditSplit(){ $('#editSplitSheet').classList.remove('on'); renderSheet(); }
+function renderEditSplitSheet(){
+  const at = draft.at;
+  const { headline } = splitSummaryText();
+  $('#editSplitSummary').textContent = headline;
 
   const inSplit = id => draft.alloc.some(a => a.p === id);
-  $('#splitRow').innerHTML = members.map(m => `
-    <button class="${inSplit(m.person_id)?'on':''} ${presentAt(m,at)?'':'away'}" data-split="${m.person_id}">
+  $('#editSplitRow').innerHTML = members.map(m => `
+    <button class="${inSplit(m.person_id)?'on':''} ${presentAt(m,at)?'':'away'}" data-split="${m.person_id}"
+      aria-pressed="${inSplit(m.person_id)}">
       <span class="mini" style="background:${colorFor(m.person_id)}">${initials(m.person.display_name)}</span>${m.person.display_name}</button>`).join('');
-  $('#splitRow').querySelectorAll('[data-split]').forEach(b => b.onclick = () => {
+  $('#editSplitRow').querySelectorAll('[data-split]').forEach(b => b.onclick = () => {
     const id = b.dataset.split;
     draft.alloc = inSplit(id) ? draft.alloc.filter(a => a.p !== id) : [...draft.alloc, {p:id, w:1}];
-    renderSheet();
+    renderEditSplitSheet();
   });
 
   const away = members.filter(m => !presentAt(m, at));
@@ -1816,9 +2141,10 @@ function renderSheet(){
   const bits = [];
   if(away.length) bits.push(`${away.map(m=>m.person.display_name).join(', ')} not here — excluded automatically.`);
   if(dry.length && draft.kind === 'round') bits.push(`${dry.map(m=>m.person.display_name).join(', ')} off rounds — skipped automatically.`);
-  $('#autoNote').textContent = bits.join(' ');
+  $('#editSplitAutoNote').textContent = bits.join(' ');
 
   $('#tglShares').textContent = draft.showShares ? 'Even split' : 'Uneven shares';
+  const tot = baseOf() + tipOf(), W = wSum() || 1;
   const sp = $('#sharesPanel');
   sp.style.display = draft.showShares ? 'block' : 'none';
   if(draft.showShares){
@@ -1833,43 +2159,70 @@ function renderSheet(){
     sp.querySelectorAll('[data-w]').forEach(b => b.onclick = () => {
       const a = draft.alloc.find(x => x.p === b.dataset.w);
       a.w = Math.max(1, Math.min(6, a.w + (+b.dataset.d)));
-      renderSheet();
+      renderEditSplitSheet();
     });
   }
-
-  const ok = draft.alloc.length > 0 && (draft.editing || baseOf() > 0);
-  $('#confirmBtn').disabled = !ok;
-  $('#confirmBtn').textContent = !draft.alloc.length ? "Pick who it's for"
-    : draft.editing ? `Save · ${draft.alloc.length} on it` : `Log ${money(tot)} · ${draft.alloc.length}-way`;
 }
+$('#editSplitCloseBtn').onclick = closeEditSplit;
+$('#applySplitBtn').onclick = closeEditSplit; // mutations are already immediate/committed — Apply just returns
+$('#selCurrentCrew').onclick = () => { draft.alloc = eligible(draft.kind, draft.at).map(p=>({p,w:1})); renderEditSplitSheet(); };
+$('#selAll').onclick    = () => { draft.alloc = members.map(m=>({p:m.person_id,w:1})); renderEditSplitSheet(); };
+$('#selNone').onclick   = () => { draft.alloc = []; renderEditSplitSheet(); };
+$('#tglShares').onclick = () => { if(draft.showShares) draft.alloc.forEach(a=>a.w=1); draft.showShares=!draft.showShares; renderEditSplitSheet(); };
 
-$('#pad').innerHTML = ['1','2','3','4','5','6','7','8','9','·','0','⌫']
-  .map(k => {
-    const label = k === '·' ? 'double zero' : k === '⌫' ? 'backspace' : k;
-    return `<button data-k="${k}" aria-label="${label}">${k}</button>`;
-  }).join('');
-$('#pad').querySelectorAll('button').forEach(b => b.onclick = () => {
-  const k = b.dataset.k;
-  if(k === '⌫') draft.digits = draft.digits.slice(0,-1);
-  else if(k === '·') draft.digits += '00';
-  else if(draft.digits.length < 7) draft.digits += k;
-  renderSheet();
+// ---------- Round Details (child sheet: Note + Receipt) ----------
+// Same draft.description / draft.receiptUrl mutations as before — only
+// the container moved. "Save Details" just closes, same reasoning as
+// Apply Split above.
+function showDetails(){
+  renderDetailsSheet();
+  $('#detailsSheet').classList.add('on');
+  requestAnimationFrame(() => $('#expDesc').focus());
+}
+function closeDetails(){ $('#detailsSheet').classList.remove('on'); renderSheet(); }
+function renderDetailsSheet(){
+  $('#expDesc').value = draft.description || '';
+  $('#expDesc').oninput = e => { draft.description = e.target.value; };
+
+  const rBtn = $('#receiptAttachBtn');
+  rBtn.classList.toggle('on', !!draft.receiptUrl);
+  rBtn.disabled = draft.receiptUploading;
+  rBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+    <span>${draft.receiptUploading ? 'Uploading…' : draft.receiptUrl ? 'Replace Receipt' : 'Attach Receipt'}</span>`;
+  $('#receiptRemoveBtn').style.display = (draft.receiptUrl && !draft.receiptUploading) ? 'block' : 'none';
+  $('#receiptError').textContent = draft.receiptError || '';
+  $('#receiptError').style.display = draft.receiptError ? 'block' : 'none';
+}
+$('#detailsCloseBtn').onclick = closeDetails;
+$('#saveDetailsBtn').onclick = closeDetails;
+$('#expDesc').addEventListener('focus', () => {
+  setTimeout(() => $('#expDesc').scrollIntoView({
+    block: 'center', behavior: prefersReducedMotion() ? 'auto' : 'smooth'
+  }), 300); // after the keyboard animates in, not before
 });
 
-$('#selPresent').onclick = () => { draft.alloc = eligible(draft.kind, draft.at).map(p=>({p,w:1})); renderSheet(); };
-$('#selAll').onclick     = () => { draft.alloc = members.map(m=>({p:m.person_id,w:1})); renderSheet(); };
-$('#selNone').onclick    = () => { draft.alloc = []; renderSheet(); };
-$('#tglShares').onclick  = () => { if(draft.showShares) draft.alloc.forEach(a=>a.w=1); draft.showShares=!draft.showShares; renderSheet(); };
 $('#receiptAttachBtn').onclick = () => $('#receiptFile').click();
+$('#receiptRemoveBtn').onclick = () => {
+  draft.receiptUrl = null;
+  draft.receiptFileName = null;
+  draft.receiptError = null;
+  renderDetailsSheet();
+  renderSheet();
+};
 $('#receiptFile').onchange = async e => {
   const file = e.target.files[0];
   e.target.value = ''; // allow re-selecting the same file later (e.g. after removing)
   if(!file) return;
-  if(file.size > 10 * 1024 * 1024) return toast('That photo is too large (10MB max)', true);
+  if(file.size > 10 * 1024 * 1024){
+    draft.receiptError = 'That file is too large (10MB max).';
+    renderDetailsSheet();
+    return toast(draft.receiptError, true);
+  }
 
-  const rBtn = $('#receiptAttachBtn'), rLbl = $('#receiptAttachLabel');
-  rBtn.disabled = true;
-  rLbl.textContent = 'Uploading…';
+  draft.receiptUploading = true;
+  draft.receiptFileName = file.name;
+  draft.receiptError = null;
+  renderDetailsSheet();
 
   // Path is namespaced by night, not by expense — for a brand-new
   // expense we don't have an expense id yet at upload time. A random
@@ -1878,14 +2231,16 @@ $('#receiptFile').onchange = async e => {
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().slice(0, 5);
   const path = `${night.id}/${crypto.randomUUID()}.${ext}`;
   const { error: upErr } = await sb.storage.from('receipts').upload(path, file);
+  draft.receiptUploading = false;
   if(upErr){
-    rBtn.disabled = false;
-    renderSheet();
+    draft.receiptFileName = null;
+    draft.receiptError = upErr.message;
+    renderDetailsSheet();
     return toast(upErr.message, true);
   }
   const { data: pub } = sb.storage.from('receipts').getPublicUrl(path);
   draft.receiptUrl = pub.publicUrl;
-  rBtn.disabled = false;
+  renderDetailsSheet();
   renderSheet();
   toast('Receipt attached');
 };
@@ -1893,7 +2248,12 @@ $('#btnRound').onclick   = () => openAdd('round');
 $('#btnLastCallFab').onclick = () => { if(isHost()) confirmLastCall(); };
 $('#btnStop').onclick    = () => openNewStop();
 $('#cancelBtn').onclick  = close;
-$('#scrim').onclick      = () => { close(); closeStopSheet(); closeLastCallSheet(); };
+$('#sheetCloseBtn').onclick = close;
+$('#scrim').onclick      = () => {
+  if($('#editSplitSheet').classList.contains('on')) return closeEditSplit();
+  if($('#detailsSheet').classList.contains('on')) return closeDetails();
+  close(); closeStopSheet(); closeLastCallSheet();
+};
 
 function openNewStop(){
   $('#stopName').value = '';
@@ -1917,14 +2277,16 @@ $('#voidBtn').onclick = async () => {
 };
 
 $('#confirmBtn').onclick = async () => {
+  const prevLabel = $('#confirmBtn').textContent;
   $('#confirmBtn').disabled = true;
+  $('#confirmBtn').textContent = draft.editing ? 'Saving…' : 'Logging…';
 
   if(draft.editing){
     const { error: e1 } = await sb.from('expense')
       .update({ payer_id: draft.payer, description: draft.description?.trim() || null,
                  receipt_url: draft.receiptUrl || null })
       .eq('id', draft.editing);
-    if(e1){ close(); return toast(e1.message, true); }
+    if(e1){ $('#confirmBtn').disabled = false; $('#confirmBtn').textContent = prevLabel; return toast(e1.message, true); }
     await sb.from('allocation').delete().eq('expense_id', draft.editing);
     const { error: e2 } = await sb.from('allocation').insert(
       draft.alloc.map(a => ({ expense_id: draft.editing, person_id: a.p, weight: a.w })));
@@ -1943,7 +2305,7 @@ $('#confirmBtn').onclick = async () => {
     created_by: me.id
   }).select().single();
 
-  if(error){ close(); return toast(error.message, true); }
+  if(error){ $('#confirmBtn').disabled = false; $('#confirmBtn').textContent = prevLabel; return toast(error.message, true); }
 
   const { error: aerr } = await sb.from('allocation').insert(
     draft.alloc.map(a => ({ expense_id: data.id, person_id: a.p, weight: a.w })));
@@ -2013,19 +2375,46 @@ $('#btnInfo').onclick = showGuide;
 $('#hdrBrand').innerHTML = headerBrand();
 $('#hdrCompactMark').innerHTML = compactMark();
 
-// Compact bar visibility — sticky positioning is free (CSS handles it);
-// this only ever toggles a class. Hysteresis (show >90px, hide <60px)
-// so it doesn't flicker in/out right at one fixed line. Also self-resets
-// correctly on tab switches, since switching tabs already does
-// main.scrollTop = 0, which fires this same 'scroll' event.
+function setHeaderCompact(isCompact){
+  $('#siteHeader').classList.toggle('compact', isCompact);
+  $('#hdrExpanded').setAttribute('aria-hidden', String(isCompact));
+  $('#hdrCompactRow').setAttribute('aria-hidden', String(!isCompact));
+}
+
+// Tab-aware compact title — same live data as the expanded header,
+// never a placeholder. No logo mark on The Tab: the receipt already
+// carries the LAST CALL branding, so repeating it here is exactly the
+// duplication this pass exists to remove.
+function updateCompactTitle(){
+  const mark = $('#hdrCompactMark'), title = $('#hdrCompactTitle');
+  if(currentTab === 'tab'){
+    mark.style.display = 'none';
+    title.textContent = 'The Tab';
+  } else if(currentTab === 'crew'){
+    mark.style.display = 'flex';
+    const stillOut = $('#hdrOut').textContent.split(' ')[0] || '0';
+    title.textContent = `${stillOut} Still Out`;
+  } else {
+    mark.style.display = 'flex';
+    title.textContent = $('#hdrContext').style.display !== 'none'
+      ? $('#hdrContext').textContent : (night?.title ?? 'Tonight');
+  }
+}
+
+// Two-state scroll behavior — expanded while at/near the top, compact
+// once scrolled in. One listener, one shared state, hysteresis so the
+// threshold doesn't flicker. Only main scrolls (single shared container
+// across all three tabs), so this one listener covers every tab.
 {
   const mainEl = $('main');
-  const compactBar = $('#hdrCompact');
-  let compactShown = false;
+  let compact = false;
   mainEl.addEventListener('scroll', () => {
     const y = mainEl.scrollTop;
-    if(!compactShown && y > 90){ compactShown = true; compactBar.classList.add('show'); }
-    else if(compactShown && y < 60){ compactShown = false; compactBar.classList.remove('show'); }
+    if(!compact && y > 80){ compact = true; setHeaderCompact(true); }
+    // Restore only near the actual top, not on any small upward scroll —
+    // per spec, this is deliberately not "scroll up a little and it pops
+    // back open."
+    else if(compact && y <= 10){ compact = false; setHeaderCompact(false); }
   }, { passive: true });
 }
 

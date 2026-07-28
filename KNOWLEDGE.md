@@ -349,7 +349,78 @@ public, and the open gap on access control.
     when attached opens the photo full-size (reuses `overlay()`); tapping
     it when empty bubbles through to the card's existing edit action
     rather than being a dead click.
-17. Not yet specified by the person.
+17. ✅ Add Round — inspection + planning (no code). Read the actual sheet
+    markup/CSS/JS rather than work from memory; identified the sheet as
+    its own scroll container (no separated header/footer), documented
+    every business rule that had to survive a redesign, and surfaced
+    three genuine open questions (tip UI model, kind-toggle reset
+    behavior, fate of "Who's here"/"Clear") via `ask_user_input_v0`
+    rather than guessing.
+18. ✅ Add Round — first redesign pass (spec-driven). Combined payer +
+    "Other expense" into one row; **tip presets reverted to always-
+    visible** (18%/20%/Custom, none pre-selected, tap-to-toggle-off) —
+    this is a real reversal of the total-first/opt-in-calculator model
+    from an earlier pass, done deliberately per explicit instruction, not
+    silently. Collapsed Note/Receipt into expandable rows with filled-
+    state summaries. Fixed "1-way" wording on the confirm button (was
+    fixed on the round card in an earlier pass, never on the sheet's own
+    button). Kind-toggle-reset question was never explicitly answered —
+    left as pre-existing behavior.
+19. ✅ Add Round — refinement pass. Found by tracing all 30 requested
+    functional states through the actual code rather than assuming:
+    there was no way to *remove* an attached receipt (only attach/
+    replace); failed uploads only surfaced via an auto-dismissing toast
+    (added a persistent inline error); `aria-pressed` was missing from
+    tip chips and payer buttons (split-row had it, the other two didn't);
+    nothing moved focus when Note/Receipt/Payer rows expanded. Also
+    removed a genuine duplication — `#presenceHint` and `#autoNote` were
+    both explaining the same presence rule at once.
+20. ✅ Add Round — full information-architecture restructuring. The
+    sheet had no fixed height (`max-height:90%` is a cap, not a target),
+    which is the literal cause of "begins too low." Split `.sheet` into
+    `.sheet-compact` (Add Stop, Last Call — unchanged) and `.sheet-full`
+    (Add Round + two new children) with a real
+    `grid-template-rows:auto minmax(0,1fr) auto`. Moved the full
+    participant grid into a new **Edit Split** child sheet (reintroduced
+    "Current Crew" — the earlier answer had dropped this action entirely;
+    this newer spec brought it back with clearer naming, treated as
+    supersession, not a mistake) and Note+Receipt into a new **Round
+    Details** child sheet. Mutations stay immediate (unchanged from
+    before) — "Apply"/"Save" just close the child sheet, since staged/
+    buffered editing was never the existing behavior to begin with.
+    Stacked three sheets via z-index (`.z2` on children) without hiding
+    the parent, so its state is never lost while a child is open.
+21. ✅ Receipt attach — file-or-photo choice. `capture="environment"` was
+    biasing mobile browsers toward the camera directly, skipping the
+    real choice; removed it. `accept="image/*"` blocked PDFs (receipts
+    are very often digital); broadened to include `application/pdf`. The
+    viewer always rendered `<img>`, which would silently break on a PDF —
+    now detects file type by extension and shows an "Open Receipt" link
+    for non-images. Camera icon → paperclip (attach button + the Tonight-
+    tab indicator), since "camera" implied photo-only. Side benefit
+    found in passing: the old indicator was an emoji, and emoji don't
+    reliably respect CSS `color` — the gray/white attached-state toggle
+    may never have actually rendered correctly; the new SVG (`currentColor`)
+    fixes this as a side effect.
+22. ✅ Two-state persistent header. The existing "compact bar" (from an
+    earlier pass) was never actually a second *state* — `header`/`nav`
+    sat outside `main` and never collapsed; the compact bar was a
+    permanent third layer fading in on top of a header that never went
+    away. Consolidated into one system: `header` now has exactly one
+    active child at a time (`.hdr-expanded` or `.hdr-compact-row`),
+    toggled by a single class off one scroll listener on `main`, with
+    hysteresis (compact past 80px, expanded only restored near the
+    actual top). Compact title is tab-aware — Tonight shows stop/round
+    context, Crew shows "N Still Out", **The Tab shows "The Tab" with no
+    logo mark at all**, since the receipt already carries the LAST CALL
+    branding and repeating it was the exact duplication this pass
+    targeted. Also: tightened expanded-header spacing (~15% padding,
+    shorter dividers), bottom tray padding trimmed, Tonight's empty-state
+    FAB-vs-central-CTA duplication fixed (scoped tightly to
+    `currentTab==='tonight' && !expenses.length`, not a blanket rule),
+    Crew intro row bumped from the 44px app-wide floor to 56px per this
+    spec's specific target.
+23. Not yet specified by the person.
 
 ## Known open gaps (real, not yet fixed)
 
@@ -369,19 +440,30 @@ public, and the open gap on access control.
   by construction) — a pre-existing gap, not introduced or fixed in any
   of these passes. Worth a dedicated look if it becomes a priority.
 - **No focus-trap/`aria-modal` on the bottom sheets** — deliberately not
-  added without real focus-trapping behind it; still open.
+  added without real focus-trapping behind it; still open. Now applies
+  to five sheets instead of three (the two new Add Round children
+  included).
 - **The `receipts` storage bucket is public**, not gated by night
   membership. Deliberate, documented tradeoff (see Architectural
   decisions) — paths are namespaced by night ID + a random UUID, not
   guessable, but this is *not* the same as the auth-gated access every
   other table in this app has via RLS + `is_night_member()`. Worth
   revisiting if this goes beyond a friend-group tool.
-- **Orphaned receipt uploads** — if someone attaches a photo mid-edit and
-  then cancels the sheet, the file stays in storage with nothing
-  pointing to it. Harmless (never surfaced anywhere, never billed), just
-  untidy. No cleanup job exists.
-- **The scroll-collapsing header is the lighter of two options
-  (Approach B — a separate fade-in bar)**, not the header itself
-  shrinking in place (Approach A). If the fade-in reminder doesn't feel
-  like enough, moving the real header into the scroll flow is the
-  documented next step, not a rebuild.
+- **Orphaned receipt uploads** — if someone attaches a file mid-edit and
+  then cancels the sheet, it stays in storage with nothing pointing to
+  it. Harmless (never surfaced anywhere, never billed), just untidy. No
+  cleanup job exists.
+- **The header is now genuinely two-state (Approach A)** — the earlier
+  "Approach B" gap entry is resolved; `header` collapses in place rather
+  than a separate bar fading in on top of a permanent expanded state.
+  The specific thresholds (80px down / 10px up, `92dvh`-style targets
+  elsewhere) are picked from spec ranges, not tuned against a live
+  device — worth a look on an actual phone.
+- **Tip UI has now reversed twice** (total-first/opt-in → always-visible
+  presets) across two passes, both times per explicit instruction, not
+  drift. Worth confirming this is the settled direction before it
+  reverses a third time.
+- **Kind-toggle-reset-on-switch** (Round ↔ Other wipes a manually-
+  adjusted split) was asked about explicitly early on and never
+  answered in any of the specs since — still the original, pre-redesign
+  behavior, still unconfirmed as intentional.

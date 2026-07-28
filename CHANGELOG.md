@@ -5,6 +5,97 @@ Dates below are conversation dates, not deploy dates. Entries under
 `last-call-handoff.md` briefing — no specific dates are available for them,
 so none are guessed.
 
+## 2026-07-28
+
+### Added
+- Add Round: Edit Split and Round Details child sheets — participant
+  editing and Note+Receipt moved off the main screen entirely, each into
+  its own focused near-full-screen sheet.
+- "Current Crew" quick action in Edit Split — resets to the presence
+  default (eligible members). This is a genuine reintroduction: an
+  earlier pass explicitly dropped "Who's here" per your own answer at
+  the time; a later, more detailed spec brought it back with clearer
+  naming, so it's back.
+- Remove Receipt action (previously attach/replace only, no way to
+  clear).
+- Persistent inline error message for failed receipt uploads (was
+  toast-only, which can read as "silently disappeared").
+- PDF support for receipts — `accept` was image-only; broadened to
+  `image/*,application/pdf`. Viewer now detects file type and shows an
+  "Open Receipt" link for non-images instead of a broken `<img>`.
+- Custom tip input (percentage) — "Custom" previously had nothing behind
+  it to open.
+- Compact, tab-aware persistent header row: Tonight shows stop/round
+  context, Crew shows "N Still Out", The Tab shows "The Tab" with no
+  logo mark (avoids repeating branding the receipt already carries).
+
+### Fixed
+- The Add Round sheet had no fixed height (`max-height:90%` is a cap,
+  not a target) — the literal cause of it "beginning too low." Now a
+  real `92dvh` near-full-screen sheet with `grid-template-rows:auto
+  minmax(0,1fr) auto`.
+- The header's "compact bar" was never actually a second state — it was
+  a permanent third layer fading in on top of a header that never
+  collapsed. Consolidated into one system: exactly one of
+  expanded/compact is ever present.
+- `capture="environment"` on the receipt file input was biasing mobile
+  browsers toward the camera directly, skipping the real file-or-photo
+  choice. Removed.
+- "1-way" wording on the Add Round confirm button (fixed on the round
+  card in an earlier pass, never on the sheet's own button).
+- `aria-pressed` missing from tip chips and payer buttons (split-row
+  participant chips already had it).
+- No focus movement when Note/Receipt/Payer rows expanded.
+- `#presenceHint` and `#autoNote` were both explaining the same presence
+  rule at the same time — removed the generic one, kept the specific one.
+- Tonight's empty state showed two equally-prominent ways to add the
+  first round (central CTA + bottom tray) — tray now hides specifically
+  when `currentTab==='tonight' && !expenses.length`.
+- Receipt icon (attach button + Tonight-tab indicator): camera → paperclip,
+  since "camera" implied photo-only once files were supported. The old
+  icon was an emoji, which doesn't reliably respect CSS `color` — the
+  gray/white attached-state toggle may never have visually worked;
+  the new SVG (`currentColor`) fixes this as a likely side effect.
+
+### Changed
+- **Tip UI reverted to always-visible presets** (18%/20%/Custom, none
+  pre-selected) — a real reversal of the total-first/opt-in-calculator
+  model from an earlier pass, done per explicit instruction in the
+  approved redesign spec, not silently.
+- Payer selector + "Other expense" combined into one row (was two
+  stacked full-width elements).
+- Split "quick actions" simplified to match your explicit answer
+  (Everyone + Uneven Shares only) in the first pass, then Current Crew
+  was reintroduced in the later restructuring pass — see Added.
+- Confirm button label simplified to "Log Round · $X.XX" / "Log Expense
+  · $X.XX" (was "Log $X · N people").
+- Expanded header spacing tightened (~15% padding reduction, shorter
+  metric dividers, tighter stop/round-count placement).
+- Bottom action tray padding trimmed (~15-20%).
+- Crew intro row height bumped from the app-wide 44px floor to 56px
+  (this row specifically called out as needing more presence).
+
+### Notes
+- Kind-toggle-reset-on-switch (Round ↔ Other wipes a manually-adjusted
+  split) was asked about explicitly and never answered across multiple
+  specs since — still original, pre-redesign behavior, still an open
+  question, not a decision made by omission.
+- Did not add a dirty-form confirmation on Cancel/× anywhere — no such
+  pattern exists elsewhere in the app to reuse, and building one from
+  scratch was explicitly out of scope ("do not create an intrusive
+  confirmation for an untouched form").
+- Did not invent an "uneven shares don't reconcile" validation state —
+  shares are weight-based ratios, which can't mismatch by construction.
+  Confirmed this reasoning twice across two separate specs that both
+  asked for it.
+- The two new child sheets (Edit Split, Round Details) don't have
+  modal/`aria-modal` focus-trap semantics, matching the same reasoning
+  applied to the original sheets — untrapped focus is better than a
+  half-implemented trap.
+- Live-device testing was not possible in this environment for any of
+  today's scroll-threshold, safe-area, or Safari/PWA-specific work —
+  flagged explicitly in each response rather than assumed to be correct.
+
 ## 2026-07-27
 
 ### Added
