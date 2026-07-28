@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Last Call</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -20,7 +20,7 @@ body{background:#0A0810;font-family:'Archivo',system-ui,sans-serif;color:var(--p
   display:flex;align-items:center;justify-content:center;padding:24px 12px;
   background-image:radial-gradient(ellipse 80% 50% at 50% -10%, rgba(232,163,61,.10), transparent 60%),
                    radial-gradient(ellipse 60% 40% at 90% 110%, rgba(255,77,141,.08), transparent 60%)}
-.phone{width:100%;max-width:400px;height:min(880px,calc(100vh - 48px));background:var(--ink);
+.phone{width:100%;max-width:400px;height:min(880px,calc(100vh - 48px));height:min(880px,calc(100dvh - 48px));background:var(--ink);
   border:1px solid var(--line);border-radius:32px;overflow:hidden;display:flex;flex-direction:column;
   position:relative;box-shadow:0 40px 80px -20px rgba(0,0,0,.8)}
 
@@ -147,6 +147,10 @@ main::-webkit-scrollbar{width:0}
 .fab button:active{transform:scale(.97)}
 .fab-main{background:var(--amber);color:var(--ink);box-shadow:0 8px 24px -6px rgba(232,163,61,.5)}
 .fab-alt{flex:0 0 62px !important;background:var(--ink2);color:var(--paper);border:1px solid var(--line) !important}
+.fab-last{flex:0 0 70px !important;background:linear-gradient(135deg,var(--magenta),#D6336C);
+  color:#fff;font-family:'Anton',sans-serif;font-size:11px;line-height:1.2;letter-spacing:.03em;
+  text-transform:uppercase;border:none !important}
+.fab-last:disabled{background:var(--ink3) !important;color:var(--dim2)}
 
 .scrim{position:absolute;inset:0;background:rgba(6,4,12,.75);backdrop-filter:blur(3px);z-index:30;display:none}
 .scrim.on{display:block;animation:fade .2s both}
@@ -156,6 +160,7 @@ main::-webkit-scrollbar{width:0}
   transform:translateY(102%);transition:transform .3s cubic-bezier(.2,.8,.2,1);max-height:90%;overflow-y:auto}
 .sheet.on{transform:none}
 .grab{width:36px;height:4px;background:var(--line);border-radius:2px;margin:0 auto 16px}
+.sheet-handle{touch-action:none;margin:-4px -4px 4px;padding:4px 4px 10px;cursor:grab}
 .sheet h2{font-family:'Anton',sans-serif;font-size:18px;letter-spacing:.03em;text-transform:uppercase;margin-bottom:3px}
 .sheet .hint{font-size:11px;color:var(--dim2);margin-bottom:16px;line-height:1.5}
 
@@ -167,7 +172,7 @@ main::-webkit-scrollbar{width:0}
 .chip.on{background:rgba(232,163,61,.16);border-color:var(--amber);color:var(--amber-hot)}
 .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
 .pad button{background:var(--ink3);border:none;color:var(--paper);border-radius:12px;padding:16px 0;
-  font-family:'IBM Plex Mono',monospace;font-size:19px;cursor:pointer}
+  font-family:'IBM Plex Mono',monospace;font-size:23px;cursor:pointer}
 .pad button:active{background:var(--line)}
 
 .who{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:6px}
@@ -253,7 +258,7 @@ main::-webkit-scrollbar{width:0}
 
   <div class="fab" id="fab" style="display:none">
     <button class="fab-main" id="btnRound">+ Round</button>
-    <button class="fab-alt" id="btnOther">$</button>
+    <button class="fab-last" id="btnLastCallFab">Last<br>Call</button>
     <button class="fab-alt" id="btnStop" title="We moved">📍</button>
   </div>
 
@@ -261,9 +266,12 @@ main::-webkit-scrollbar{width:0}
   <div class="scrim" id="scrim"></div>
 
   <div class="sheet" id="sheet">
-    <div class="grab"></div>
-    <h2 id="shTitle"></h2>
-    <p class="hint" id="shHint"></p>
+    <div class="sheet-handle">
+      <div class="grab"></div>
+      <h2 id="shTitle"></h2>
+      <p class="hint" id="shHint"></p>
+    </div>
+    <button class="link" id="toggleKind" style="padding:0;margin-bottom:14px"></button>
     <div class="section-lbl">Paid by</div>
     <div class="who" id="payerRow"></div>
     <div class="amount-display" id="amtDisp"></div>
@@ -290,9 +298,11 @@ main::-webkit-scrollbar{width:0}
   </div>
 
   <div class="sheet" id="stopSheet" style="padding:20px 20px 24px">
-    <div class="grab"></div>
-    <h2>We moved</h2>
-    <p class="hint">Name it if you know it — you can rename later. Leave it blank and it'll just be "Stop N".</p>
+    <div class="sheet-handle">
+      <div class="grab"></div>
+      <h2>We moved</h2>
+      <p class="hint">Name it if you know it — you can rename later. Leave it blank and it'll just be "Stop N".</p>
+    </div>
     <input id="stopName" placeholder="e.g. Marlowe's" maxlength="60"
       style="width:100%;background:var(--ink3);border:1px solid var(--line);border-radius:10px;
         padding:12px;color:var(--paper);font-family:'Archivo';font-size:16px;margin-bottom:14px">
@@ -316,7 +326,6 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const SUPABASE_URL  = 'https://rkxmpvkhrchgkqocguwt.supabase.co';
 const PUBLISHABLE   = 'sb_publishable_vF8xIr2yzxZRk_ozdHT-bQ_kcOiAEel';
 const DUST_CENTS    = 200;           // $2 materiality threshold
-const DEFAULT_CODE  = 'LASTCALL';    // dev seed night
 
 const sb = createClient(SUPABASE_URL, PUBLISHABLE);
 
@@ -404,7 +413,7 @@ async function boot(){
   const { data: nowPermanent } = await sb.rpc('sync_permanence');
   if(typeof nowPermanent === 'boolean') me.is_permanent = nowPermanent;
 
-  const code = new URLSearchParams(location.search).get('code') || DEFAULT_CODE;
+  const code = new URLSearchParams(location.search).get('code') || '';
   const { data: existing, error: exErr } = await sb.from('night_member')
     .select('night_id').eq('person_id', me.id)
     .order('joined_at', { ascending: false }).limit(1);
@@ -474,7 +483,7 @@ function promptSignIn(){
     }
     overlay('Check your email', `Sent a sign-in link to <code>${email}</code>.<br><br>Tap it — you'll land back here signed in, on any device.`);
   };
-  $('#backToJoin3').onclick = () => promptJoin(new URLSearchParams(location.search).get('code') || DEFAULT_CODE);
+  $('#backToJoin3').onclick = () => promptJoin(new URLSearchParams(location.search).get('code') || '');
 }
 
 function promptStart(){
@@ -499,7 +508,7 @@ function promptStart(){
     if(person) me = person;
     showNightCreated(row.night_id, row.join_code);
   };
-  $('#backToJoin').onclick = () => promptJoin(new URLSearchParams(location.search).get('code') || DEFAULT_CODE);
+  $('#backToJoin').onclick = () => promptJoin(new URLSearchParams(location.search).get('code') || '');
 }
 
 function showNightCreated(nightId, code){
@@ -542,8 +551,25 @@ async function load(nightId){
 
 async function refreshPlan(){
   if(!night) return;
+
+  if(night.status === 'closed'){
+    // Once closed, the settlement is a fact of record — read the
+    // snapshot written at close time, not a live recomputation. A live
+    // recompute is exactly what broke: if anyone with financial
+    // history leaves afterward, the ledger can no longer balance and
+    // this silently returned nothing instead of the real numbers.
+    const { data, error } = await sb.from('settlement').select('*').eq('night_id', night.id);
+    if(error){ console.error(error); plan = []; return; }
+    plan = (data || []).map(s => ({
+      from_person: s.from_person, to_person: s.to_person,
+      amount_cents: s.amount_cents, is_dust: false
+    }));
+    return;
+  }
+
   const { data, error } = await sb.rpc('settle_night',
     { p_night_id: night.id, p_dust_cents: DUST_CENTS });
+  if(error) console.error('settle_night failed:', error);
   plan = error ? [] : (data || []);
 }
 
@@ -603,6 +629,12 @@ function renderHeader(){
   $('#hdrYou').textContent   = money0(mine?.owed_cents ?? 0);
   $('#hdrOut').textContent   = `${members.filter(m => presentAt(m, now)).length}/${members.length}`;
   $('#fab').style.display    = isOpen() ? 'flex' : 'none';
+
+  const lcFab = $('#btnLastCallFab');
+  if(lcFab){
+    lcFab.disabled = !isHost();
+    lcFab.title = isHost() ? 'Close the night' : `Only ${nameOf(night.host_id)} can close the night`;
+  }
 }
 
 function renderTonight(){
@@ -651,14 +683,9 @@ function renderTonight(){
     </div>`;
   }).join('');
 
-  $('#pane-tonight').innerHTML = (html || `<div style="text-align:center;padding:50px 10px;color:var(--dim2)">
+  $('#pane-tonight').innerHTML = html || `<div style="text-align:center;padding:50px 10px;color:var(--dim2)">
       <div style="font-family:Anton;font-size:20px;color:var(--paper)">Nothing logged yet</div>
-      <p style="font-size:13px;margin-top:8px;line-height:1.6">Hit <b>+ Round</b> when someone buys.</p></div>`)
-    + (isOpen() && isHost()
-        ? `<button class="lastcall" id="btnLastCall">Last Call<small>CLOSE THE NIGHT · PRINT THE TAB</small></button>`
-        : isOpen()
-        ? `<button class="lastcall" disabled>Last Call<small>ONLY ${nameOf(night.host_id).toUpperCase()} CAN CLOSE THE NIGHT</small></button>`
-        : '');
+      <p style="font-size:13px;margin-top:8px;line-height:1.6">Hit <b>+ Round</b> when someone buys.</p></div>`;
 
   $('#pane-tonight').querySelectorAll('[data-flag]').forEach(b => b.onclick = async ev => {
     ev.stopPropagation();
@@ -669,7 +696,6 @@ function renderTonight(){
     toast(next === 'disputed' ? 'Flagged — held out of the tab' : 'Unflagged');
   });
   $('#pane-tonight').querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openEdit(b.dataset.edit));
-  const lc = $('#btnLastCall'); if(lc) lc.onclick = confirmLastCall;
 }
 
 function renderCrew(){
@@ -678,10 +704,22 @@ function renderCrew(){
   const span = Math.max(now - t0, 1);
 
   const canLeave = !isHost() || !isOpen();
+
+  const inviteUrl = `${location.origin}${location.pathname}?code=${night.join_code}`;
+  const smsBody = `Join "${night.title}" on Last Call — code ${night.join_code}\n${inviteUrl}`;
+  // iOS and Android disagree on the sms: URI format. This is the
+  // standard cross-platform workaround; there's no reliable feature
+  // detection for it, just user-agent sniffing.
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const smsHref = (isIOS ? 'sms:&body=' : 'sms:?body=') + encodeURIComponent(smsBody);
+
   $('#pane-crew').innerHTML =
     `<div class="note-box"><b style="color:var(--paper)">Presence drives the split.</b><br>
       Tap someone out when they leave and every expense logged after that skips them automatically.
-      ${isHost() ? `<br><br>Join code: <span class="code-chip">${night.join_code}</span>` : ''}
+      ${isHost() ? `<br><br>Join code: <span class="code-chip">${night.join_code}</span>
+        <a href="${smsHref}" style="display:inline-block;margin-left:8px;background:var(--amber);
+          color:var(--ink);border-radius:8px;padding:6px 12px;font-family:'IBM Plex Mono',monospace;
+          font-size:11px;letter-spacing:.06em;text-transform:uppercase;text-decoration:none">Text it</a>` : ''}
       <br><br><button class="link" id="btnSwitchNight" style="padding:0">Not this night? Switch</button>
       <br>${canLeave
         ? `<button class="link" id="btnLeaveNight" style="padding:0;color:var(--magenta)">Leave this night entirely</button>`
@@ -733,21 +771,44 @@ function renderCrew(){
   });
 
   const sw = $('#btnSwitchNight');
-  if(sw) sw.onclick = () => {
+  if(sw) sw.onclick = confirmSwitchNight;
+
+  const lv = $('#btnLeaveNight');
+  if(lv) lv.onclick = confirmLeaveNight;
+}
+
+function confirmSwitchNight(){
+  overlay('Switch away from this night?', 'You\'re not leaving — you\'ll still be a member here. This just takes you to the chooser so you can join or start another.');
+  $('#ovBody').innerHTML = `
+    <div style="display:flex;gap:10px;width:100%;max-width:260px;margin-top:6px">
+      <button id="switchCancel" style="flex:1;background:none;border:1px solid var(--line);color:var(--paper)">Stay here</button>
+      <button id="switchConfirm" style="flex:1;background:var(--amber);color:var(--ink)">Switch</button>
+    </div>`;
+  $('#switchCancel').onclick = hideOverlay;
+  $('#switchConfirm').onclick = () => {
     // Doesn't delete or leave anything — you're still a member of this
     // night. Just re-opens the chooser so you can join or start another.
     // Whichever one you enter next becomes the resume target on reload,
     // since boot() picks the most recently joined membership.
-    promptJoin(new URLSearchParams(location.search).get('code') || DEFAULT_CODE);
+    promptJoin(new URLSearchParams(location.search).get('code') || '');
   };
+}
 
-  const lv = $('#btnLeaveNight');
-  if(lv) lv.onclick = async () => {
+function confirmLeaveNight(){
+  overlay('Leave this night?', 'You\'ll stop seeing it entirely — anyone still in it keeps their tab as-is.');
+  $('#ovBody').innerHTML = `
+    <div style="display:flex;gap:10px;width:100%;max-width:260px;margin-top:6px">
+      <button id="leaveCancel" style="flex:1;background:none;border:1px solid var(--line);color:var(--paper)">Stay</button>
+      <button id="leaveConfirm" style="flex:1;background:var(--magenta)">Leave</button>
+    </div>`;
+  $('#leaveCancel').onclick = hideOverlay;
+  $('#leaveConfirm').onclick = async () => {
+    $('#leaveConfirm').textContent = 'Leaving…';
     const { error } = await sb.rpc('leave_night', { p_night_id: night.id });
-    if(error) return toast(error.message, true);
+    if(error){ $('#ovSub').textContent = error.message; $('#leaveConfirm').textContent = 'Leave'; return; }
     if(currentChannel){ sb.removeChannel(currentChannel); currentChannel = null; }
     night = null; members = []; stops = []; expenses = []; balances = []; plan = [];
-    promptJoin(DEFAULT_CODE);
+    promptJoin('');
   };
 }
 
@@ -872,14 +933,22 @@ function eligible(kind, at){
   return members.filter(m => presentAt(m, at) && !(kind === 'round' && m.is_dry)).map(m => m.person_id);
 }
 
+function applyKindLabels(){
+  $('#shTitle').textContent = draft.kind === 'round' ? "Who's buying?" : 'Log an expense';
+  $('#shHint').textContent  = draft.kind === 'round'
+    ? 'Split defaults to whoever is out right now, minus anyone not drinking.'
+    : "Cover, cab, coat check, cash tip — anything that isn't a round.";
+  $('#toggleKind').textContent = draft.kind === 'round'
+    ? 'Not a round? Log something else instead'
+    : 'Actually, this is a round';
+}
+
 function openAdd(kind){
   const at = new Date();
   draft = { editing:null, kind, payer: me.id, digits:'', tip: 0,
             showShares:false, at, alloc: eligible(kind, at).map(p => ({p, w:1})) };
-  $('#shTitle').textContent = kind === 'round' ? "Who's buying?" : 'Log an expense';
-  $('#shHint').textContent  = kind === 'round'
-    ? 'Split defaults to whoever is out right now, minus anyone not drinking.'
-    : "Cover, cab, coat check, cash tip — anything that isn't a round.";
+  applyKindLabels();
+  $('#toggleKind').style.display = 'block';
   $('#pad').style.display = 'grid';
   $('#voidBtn').style.display = 'none';
   show();
@@ -892,29 +961,41 @@ function openEdit(id){
             alloc: e.allocation.map(a => ({ p:a.person_id, w:Number(a.weight) })) };
   $('#shTitle').textContent = 'Edit expense';
   $('#shHint').textContent = `${e.note ?? 'Expense'} · logged ${clock(e.occurred_at)}. Drop someone out or give them a bigger share.`;
+  $('#toggleKind').style.display = 'none';
   $('#pad').style.display = 'none';
   $('#voidBtn').style.display = 'block';
   show();
 }
+$('#toggleKind').onclick = () => {
+  draft.kind = draft.kind === 'round' ? 'other' : 'round';
+  draft.alloc = eligible(draft.kind, draft.at).map(p => ({ p, w:1 }));
+  applyKindLabels();
+  renderSheet();
+};
 function show(){ renderSheet(); $('#scrim').classList.add('on'); $('#sheet').classList.add('on'); }
 function close(){ $('#scrim').classList.remove('on'); $('#sheet').classList.remove('on'); }
 
-// Drag-to-dismiss. Only starts from the grab handle / title / hint —
+// Drag-to-dismiss, from the header zone (handle/title/hint) only —
 // not the interactive body — so it doesn't hijack typing or tapping
 // the keypad. Pulling past the threshold closes it; short of that,
-// it springs back.
+// it springs back. touch-action:none on the handle + setPointerCapture
+// stop the browser's own scroll/bounce gesture from competing with
+// the drag on a real touchscreen — without both, this "works" with a
+// mouse and does nothing reliable on an actual phone.
 function makeSwipeToClose(sheetEl, closeFn){
   const DISMISS_PX = 90;
+  const handle = sheetEl.querySelector('.sheet-handle');
   let startY = null, dragging = false;
 
-  sheetEl.addEventListener('pointerdown', e => {
-    if(!e.target.closest('.grab, h2, .hint')) return;
+  handle.addEventListener('pointerdown', e => {
     startY = e.clientY;
     dragging = true;
+    handle.setPointerCapture(e.pointerId);
     sheetEl.style.transition = 'none';
   });
-  window.addEventListener('pointermove', e => {
+  handle.addEventListener('pointermove', e => {
     if(!dragging) return;
+    e.preventDefault();
     const dy = e.clientY - startY;
     if(dy > 0) sheetEl.style.transform = `translateY(${dy}px)`;
   });
@@ -926,8 +1007,8 @@ function makeSwipeToClose(sheetEl, closeFn){
     sheetEl.style.transform = '';
     if(dy > DISMISS_PX) closeFn();
   };
-  window.addEventListener('pointerup', release);
-  window.addEventListener('pointercancel', release);
+  handle.addEventListener('pointerup', release);
+  handle.addEventListener('pointercancel', release);
 }
 makeSwipeToClose($('#sheet'), close);
 makeSwipeToClose($('#stopSheet'), closeStopSheet);
@@ -1008,7 +1089,7 @@ $('#selAll').onclick     = () => { draft.alloc = members.map(m=>({p:m.person_id,
 $('#selNone').onclick    = () => { draft.alloc = []; renderSheet(); };
 $('#tglShares').onclick  = () => { if(draft.showShares) draft.alloc.forEach(a=>a.w=1); draft.showShares=!draft.showShares; renderSheet(); };
 $('#btnRound').onclick   = () => openAdd('round');
-$('#btnOther').onclick   = () => openAdd('other');
+$('#btnLastCallFab').onclick = () => { if(isHost()) confirmLastCall(); };
 $('#btnStop').onclick    = () => openNewStop();
 $('#cancelBtn').onclick  = close;
 $('#scrim').onclick      = () => { close(); closeStopSheet(); };
