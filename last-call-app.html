@@ -2,14 +2,22 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#120D1C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/icon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
 <title>Last Call</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
 <style>
 :root{
-  --ink:#14101F; --ink2:#1D1730; --ink3:#2A2142; --line:#372C52;
+  --ink:#1B1628; --ink2:#241D38; --ink3:#2A2142; --line:#41355F;
   --amber:#E8A33D; --amber-hot:#FFC061; --magenta:#FF4D8D;
   --teal:#3DD9B0; --violet:#8B7BFF; --paper:#F5EFE6;
   /* Text hierarchy — 3 tiers. dim2 was #6E6484 (2.7–3.4:1, fails WCAG AA's
@@ -25,9 +33,9 @@
   --r-sm:8px; --r-md:12px; --r-lg:16px; --r-full:999px;
   --tap-min:44px; /* minimum height for primary tappable controls */
 }
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 html,body{height:100%}
-body{background:#0A0810;font-family:'Archivo',system-ui,sans-serif;color:var(--paper);
+body{background:#120D1C;font-family:'Archivo',system-ui,sans-serif;color:var(--paper);
   display:flex;align-items:center;justify-content:center;padding:24px 12px;
   background-image:radial-gradient(ellipse 80% 50% at 50% -10%, rgba(232,163,61,.10), transparent 60%),
                    radial-gradient(ellipse 60% 40% at 90% 110%, rgba(255,77,141,.08), transparent 60%)}
@@ -35,37 +43,101 @@ body{background:#0A0810;font-family:'Archivo',system-ui,sans-serif;color:var(--p
   border:1px solid var(--line);border-radius:32px;overflow:hidden;display:flex;flex-direction:column;
   position:relative;box-shadow:0 40px 80px -20px rgba(0,0,0,.8)}
 
+/* On an actual phone, the floating rounded card was wasting real screen
+   space — dark padding and a visible border around the edges that a real
+   installed app (or even just Safari) doesn't need. The card mockup now
+   only shows on wider viewports (desktop preview); real phone widths get
+   the full screen. safe-area-inset-top is handled here specifically
+   because the card treatment never touched the real screen edge before,
+   so it never needed to account for a notch/Dynamic Island — going
+   edge-to-edge means the header now can. */
+@media (max-width:480px){
+  body{padding:0}
+  .phone{max-width:100%;height:100dvh;border-radius:0;border:none;box-shadow:none}
+  header{padding-top:calc(20px + env(safe-area-inset-top))}
+}
+
 header{padding:20px 20px 14px;border-bottom:1px solid var(--line);
   background:linear-gradient(180deg, rgba(232,163,61,.07), transparent);flex-shrink:0}
 .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;
   text-transform:uppercase;color:var(--dim2);display:flex;justify-content:space-between;align-items:center}
-.live{color:var(--magenta);display:flex;align-items:center;gap:5px}
+.eyebrow-left{display:flex;align-items:center;gap:8px;min-width:0}
+.eyebrow-left #hdrTitle{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.info-btn{flex-shrink:0;width:44px;height:44px;margin:-13px -13px -13px -8px;padding:0;
+  border-radius:50%;border:none;background:none;color:var(--dim2);
+  font-family:'Georgia',serif;font-style:italic;font-size:13px;font-weight:700;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  text-transform:none;letter-spacing:0;transition:color .15s}
+.info-btn:hover{color:var(--amber-hot)}
+.info-btn:focus-visible{outline:2px solid var(--amber-hot);outline-offset:1px}
+.info-btn:active{color:var(--amber)}
+.live{color:var(--magenta);display:flex;align-items:center;gap:5px;flex-shrink:0}
 .live.closed{color:var(--dim2)}
 .live.offline{color:var(--dim2)}
 .dot{width:5px;height:5px;border-radius:50%;background:currentColor;animation:pulse 2.4s ease-in-out infinite}
 .live.closed .dot{animation:none}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-h1{font-family:'Anton',sans-serif;font-size:34px;letter-spacing:.02em;line-height:1;margin:8px 0 12px;text-transform:uppercase}
+/* Persistent header brand — real logo mark + wordmark, no tagline (that
+   stays exclusive to the landing overlay and the info guide, so it isn't
+   diluted by appearing on every screen). Sized down from the landing
+   version via .lc-mark-sm; the wordmark is still the page's one <h1>. */
+.hdr-brand{display:flex;align-items:center;gap:13px;margin:10px 0 14px}
+.lc-mark-sm{width:26px;height:26px;flex-shrink:0}
+.hdr-brand-word{font-family:'Playfair Display',serif;font-weight:900;font-size:25px;
+  letter-spacing:.01em;line-height:1;text-transform:uppercase;color:var(--paper)}
 .totals{display:flex;align-items:baseline}
-.tot-block{padding:0 16px}
+.tot-block{position:relative;padding:0 16px}
 .tot-block:first-child{padding-left:0}
-.tot-block+.tot-block{border-left:1px solid var(--line)}
+.tot-block+.tot-block::before{content:'';position:absolute;left:0;top:18%;bottom:18%;
+  width:1px;background:var(--line);opacity:.6}
 .tot-big{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;color:var(--amber);
-  white-space:nowrap}
-.tot-lbl{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim2)}
-.tot-sub{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--dim);white-space:nowrap}
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.tot-lbl{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim2)}
+.tot-sub{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--dim);
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.hdr-context{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--dim2);margin:-4px 0 12px}
+@media (max-width:350px){
+  .tot-block+.tot-block::before{display:none}
+  .tot-block{padding:0 10px}
+  .tot-block:first-child{padding-left:0}
+}
 
 nav{display:flex;border-bottom:1px solid var(--line);flex-shrink:0;background:var(--ink)}
 nav button{flex:1;position:relative;background:none;border:none;cursor:pointer;
-  min-height:var(--tap-min);padding:0 4px;display:flex;align-items:center;justify-content:center;
-  font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+  min-height:52px;padding:0 4px;display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
   color:var(--dim2);transition:color .18s}
 nav button::after{content:'';position:absolute;left:50%;bottom:-1px;transform:translateX(-50%);
-  width:26px;height:2px;border-radius:2px 2px 0 0;background:transparent;transition:background .18s}
-nav button[aria-selected="true"]{color:var(--amber-hot)}
+  width:60px;height:3px;border-radius:3px 3px 0 0;background:transparent;transition:background .18s}
+nav button[aria-selected="true"]{color:var(--amber-hot);font-weight:700}
 nav button[aria-selected="true"]::after{background:var(--amber)}
 
-main{flex:1;overflow-y:auto;overscroll-behavior:contain}
+main{flex:1;overflow-y:auto;overscroll-behavior:contain;position:relative}
+/* Compact reminder bar (approach "B" from the collapsing-header discussion):
+   the real header never moves — this is a second, small, sticky bar that
+   fades in once you've scrolled a bit into a long pane, and fades out near
+   the top. Sticky, not JS-positioned — the browser handles where it sits;
+   JS only ever toggles the .show class. pointer-events:none + aria-hidden
+   because every value here is already accessible from the real header;
+   this is a convenience, not a second interactive surface. */
+.hdr-compact{position:sticky;top:0;z-index:15;pointer-events:none;height:38px;margin-bottom:-38px;
+  display:flex;align-items:center;gap:8px;padding:0 20px;
+  background:var(--ink);border-bottom:1px solid var(--line);
+  opacity:0;transform:translateY(-4px);transition:opacity .2s ease,transform .2s ease}
+.hdr-compact.show{opacity:1;transform:none}
+.hdr-compact-mark{flex-shrink:0;width:18px;height:18px;display:flex}
+.hdr-compact-mark svg{width:100%;height:100%}
+.hdr-compact-word{font-family:'Playfair Display',serif;font-weight:900;font-size:14px;
+  letter-spacing:.01em;text-transform:uppercase;color:var(--paper);flex-shrink:0}
+.hdr-compact-total{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:13px;
+  font-weight:600;color:var(--amber);font-variant-numeric:tabular-nums;white-space:nowrap}
+.hdr-compact-live{display:flex;align-items:center;gap:4px;font-family:'IBM Plex Mono',monospace;
+  font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--magenta);flex-shrink:0}
+.hdr-compact-live.closed{color:var(--dim2)}
+.hdr-compact-live .dot{width:5px;height:5px;border-radius:50%;background:currentColor;
+  animation:pulse 2.4s ease-in-out infinite}
+.hdr-compact-live.closed .dot{animation:none}
 main::-webkit-scrollbar{width:0}
 .pane{display:none;padding:18px 20px 120px}
 .pane.on{display:block}
@@ -86,6 +158,7 @@ main::-webkit-scrollbar{width:0}
    happen. data-edit is the single source of truth for both. */
 .exp[data-edit]{cursor:pointer}
 .exp[data-edit]:hover{border-color:var(--line)}
+.exp[data-edit]:focus-visible{outline:2px solid var(--amber-hot);outline-offset:2px}
 @keyframes slidein{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .av{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;flex-shrink:0;
   font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;color:var(--ink)}
@@ -99,16 +172,24 @@ main::-webkit-scrollbar{width:0}
    jargon moved out of the primary line entirely (see exp-sub for the
    uneven-split qualifier, kept minimal). */
 .exp-meta{font-size:12px;color:var(--dim);margin-top:3px;line-height:1.3}
+.exp-desc{font-size:11.5px;color:var(--dim);font-style:italic;margin-top:2px;
+  overflow-wrap:anywhere;line-height:1.35}
 /* Tier 3 — secondary metadata: time, stop, tip. Smallest, dimmest. */
 .exp-sub{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim2);margin-top:2px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .exp-amt-col{flex-shrink:0;text-align:right}
 .exp-amt{font-family:'IBM Plex Mono',monospace;font-size:19px;font-weight:700;color:var(--paper);
   white-space:nowrap}
+.receipt-btn{margin-top:4px;background:none;border:none;padding:4px;min-width:28px;min-height:28px;
+  display:flex;align-items:center;justify-content:center;margin-left:auto;
+  font-size:14px;line-height:1;color:var(--dim2);cursor:pointer;opacity:.55}
+.receipt-btn.on{color:var(--paper);opacity:1}
+.receipt-btn:hover{opacity:1}
 .exp-chev{color:var(--dim2);font-size:16px;flex-shrink:0}
 
 .flag{background:none;border:none;cursor:pointer;color:var(--dim2);padding:3px 2px;
-  display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;min-width:30px}
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  flex-shrink:0;min-width:36px;min-height:36px}
 .flag-ico{font-size:13px;line-height:1}
 .flag-lbl{font-family:'IBM Plex Mono',monospace;font-size:7.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
 .flag:hover,.flag.on{color:var(--magenta)}
@@ -139,7 +220,7 @@ main::-webkit-scrollbar{width:0}
 .prow{padding:14px 0;border-bottom:1px solid var(--ink3)}
 .prow:last-child{border:none}
 .ptop{display:flex;align-items:center;gap:12px}
-.pname{flex:1;font-size:14px;font-weight:600}
+.pname{flex:1;min-width:0;overflow-wrap:anywhere;font-size:14px;font-weight:600}
 .ptag{font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
   border-radius:var(--r-sm);padding:2px 6px;margin-left:6px}
 .tag-dry{color:var(--teal);border:1px solid rgba(61,217,176,.4)}
@@ -166,7 +247,8 @@ main::-webkit-scrollbar{width:0}
 .pmeta{display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--dim2)}
 .pbtns{display:flex;gap:6px;margin-top:9px}
 .mini-btn{background:none;border:1px solid var(--line);color:var(--dim2);border-radius:var(--r-sm);
-  font-size:11px;font-weight:600;letter-spacing:.02em;padding:7px 10px;
+  font-size:11px;font-weight:600;letter-spacing:.02em;padding:7px 10px;min-height:var(--tap-min);
+  display:inline-flex;align-items:center;justify-content:center;
   cursor:pointer;transition:.15s;text-transform:uppercase}
 .mini-btn.on{border-color:var(--teal);color:var(--teal);background:rgba(61,217,176,.1)}
 .mini-btn.warn.on{border-color:var(--magenta);color:var(--magenta);background:rgba(255,77,141,.1)}
@@ -178,47 +260,99 @@ main::-webkit-scrollbar{width:0}
 .code-chip{font-family:'IBM Plex Mono',monospace;background:var(--ink3);border:1px solid var(--line);
   border-radius:6px;padding:3px 8px;color:var(--amber-hot);letter-spacing:.14em;font-size:12px}
 
-/* Crew intro card — heading, join-code + invite actions, then a visually
-   separate block for switch/leave/close (lower-priority, some destructive). */
-.crew-intro-head{font-family:'Anton',sans-serif;font-size:15px;letter-spacing:.03em;
-  text-transform:uppercase;color:var(--paper);margin-bottom:5px}
+/* Crew intro card — collapsed by default. <summary> is the whole tap
+   target (native keyboard/screen-reader disclosure semantics for free);
+   the default marker is replaced with a rotating chevron so the "closed
+   vs open" state doesn't rely on a browser-default triangle alone. */
+.crew-intro{background:var(--ink2);border:1px solid var(--ink3);border-radius:var(--r-md);
+  margin-bottom:16px;overflow:hidden}
+.crew-intro-summary{list-style:none;cursor:pointer;padding:13px;min-height:var(--tap-min);
+  display:flex;align-items:center;justify-content:space-between;gap:10px}
+.crew-intro-summary::-webkit-details-marker{display:none}
+.crew-intro-summary::after{content:'⌄';font-size:16px;color:var(--dim2);flex-shrink:0;
+  transition:transform .15s}
+.crew-intro[open] .crew-intro-summary::after{transform:rotate(180deg)}
+.crew-intro-head{flex:1;min-width:0;font-family:'Anton',sans-serif;font-size:15px;letter-spacing:.03em;
+  text-transform:uppercase;color:var(--paper)}
+.crew-intro-hint{font-size:10.5px;color:var(--dim2);letter-spacing:.02em;
+  flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crew-intro-body{padding:0 13px 13px;font-size:11.5px;line-height:1.55;color:var(--dim)}
+@media (max-width:340px){
+  .crew-intro-hint{display:none}
+}
 .crew-code-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:13px}
 .crew-code-label{font-size:11px;color:var(--dim2)}
-.crew-btn{border:none;border-radius:var(--r-sm);min-height:34px;padding:0 13px;
+.crew-btn{border:none;border-radius:var(--r-sm);min-height:var(--tap-min);padding:0 13px;
+  display:inline-flex;align-items:center;justify-content:center;
   font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;cursor:pointer}
 .crew-btn.primary{background:var(--amber);color:var(--ink)}
 .crew-btn.ghost{background:none;border:1px solid var(--line);color:var(--paper)}
 .crew-btn.copied{background:var(--teal);color:var(--ink)}
 .crew-host-actions{margin-top:14px;padding-top:12px;border-top:1px solid var(--ink3);
   display:flex;flex-direction:column;align-items:flex-start;gap:10px}
-.crew-link{background:none;border:none;padding:0;cursor:pointer;
+.crew-link{background:none;border:none;padding:0;cursor:pointer;min-height:var(--tap-min);
+  display:flex;align-items:center;
   font-size:12.5px;font-weight:600;color:var(--dim)}
 .crew-link.danger{color:var(--magenta)}
 .crew-hint{font-size:10.5px;color:var(--dim2);letter-spacing:.02em}
 
-.receipt{background:var(--paper);color:#1A1520;font-family:'IBM Plex Mono',monospace;font-size:11.5px;
-  line-height:1.65;padding:22px 20px 26px;position:relative;filter:drop-shadow(0 14px 26px rgba(0,0,0,.5));
-  animation:print .7s cubic-bezier(.2,.8,.2,1) both;
+.receipt{background:var(--paper);color:#1A1520;font-family:'IBM Plex Mono',monospace;font-size:12px;
+  line-height:1.7;padding:22px 20px 26px;position:relative;filter:drop-shadow(0 14px 26px rgba(0,0,0,.5));
+  animation:print .7s cubic-bezier(.2,.8,.2,1) both;width:100%;max-width:100%;box-sizing:border-box;
+  font-variant-numeric:tabular-nums;
   clip-path:polygon(0 8px,4% 0,8% 8px,12% 0,16% 8px,20% 0,24% 8px,28% 0,32% 8px,36% 0,40% 8px,44% 0,48% 8px,52% 0,56% 8px,60% 0,64% 8px,68% 0,72% 8px,76% 0,80% 8px,84% 0,88% 8px,92% 0,96% 8px,100% 0,100% calc(100% - 8px),96% 100%,92% calc(100% - 8px),88% 100%,84% calc(100% - 8px),80% 100%,76% calc(100% - 8px),72% 100%,68% calc(100% - 8px),64% 100%,60% calc(100% - 8px),56% 100%,52% calc(100% - 8px),48% 100%,44% calc(100% - 8px),40% 100%,36% calc(100% - 8px),32% 100%,28% calc(100% - 8px),24% 100%,20% calc(100% - 8px),16% 100%,12% calc(100% - 8px),8% 100%,4% calc(100% - 8px),0 100%)}
 @keyframes print{from{opacity:0;transform:translateY(-24px) scaleY(.9);transform-origin:top}to{opacity:1;transform:none}}
 .r-center{text-align:center}
 .r-title{font-family:'Anton',sans-serif;font-size:22px;letter-spacing:.06em;margin:4px 0 2px}
-.r-rule{border-top:1px dashed #1A1520;opacity:.45;margin:10px 0}
-.r-line{display:flex;justify-content:space-between;gap:10px}
-.r-muted{opacity:.6}
-.r-pay{display:flex;justify-content:space-between;gap:8px;padding:7px 0;
-  border-bottom:1px dotted rgba(26,21,32,.3);animation:stamp .4s ease both}
+/* Running vs. final status — wording carries the distinction, not just
+   color (a running/final label reads the same to a screen reader or
+   under forced-colors as it does visually). */
+.r-status{font-family:'Anton',sans-serif;font-size:13px;letter-spacing:.09em;margin-top:3px}
+.r-status.running{color:#8A5A12}
+.r-status.final{color:#1A1520}
+.r-status-sub{font-size:10.5px;opacity:.65;margin-top:1px}
+.r-preview-note{font-size:10px;opacity:.62;text-align:center;font-style:italic;
+  margin:8px 0 2px;line-height:1.5}
+.r-rule{border-top:1px dashed #1A1520;opacity:.45;margin:14px 0}
+.r-line{display:flex;justify-content:space-between;gap:10px;padding:2px 0}
+.r-muted{opacity:.65}
+.r-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Who-pays-who — one payment per block: names+verb, amount, status, then
+   at most one action button. Stacked rather than the old single-line
+   arrow layout so long names truncate instead of squeezing the amount. */
+.r-pay{padding:9px 0;border-bottom:1px dotted rgba(26,21,32,.3);animation:stamp .4s ease both}
 @keyframes stamp{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+.r-pay-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.r-pay-line{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px}
+.r-pay-amt{font-weight:700;font-size:13px;flex-shrink:0}
+.r-pay-status{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;opacity:.65;margin-top:2px}
 .r-big{font-family:'Anton',sans-serif;font-size:15px;letter-spacing:.03em}
-.r-stat{display:flex;justify-content:space-between;font-size:10.5px;opacity:.75}
+.r-stat{display:flex;justify-content:space-between;gap:10px;font-size:10.5px;opacity:.75;padding:2px 0}
+.r-stat span:last-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:1}
 .r-dust{font-size:10.5px;opacity:.7;font-style:italic;padding:6px 0 2px}
-.venmo{width:100%;margin-top:9px;background:#1A1520;color:var(--paper);border:none;
+.venmo{width:100%;margin-top:8px;background:#1A1520;color:var(--paper);border:none;
   border-radius:var(--r-sm);padding:9px;min-height:var(--tap-min);display:flex;align-items:center;justify-content:center;
   cursor:pointer;font-size:13px;font-weight:600;letter-spacing:.02em;text-align:center;text-decoration:none}
-.settled{opacity:.4}
-.preview-tag{background:rgba(232,163,61,.14);border:1px solid rgba(232,163,61,.45);color:var(--amber-hot);
-  border-radius:var(--r-sm);padding:9px 11px;margin-bottom:14px;
-  font-size:12px;font-weight:600;line-height:1.5}
+.settled{opacity:.65}
+
+/* Action row beneath the receipt card, plus the Details panel it can
+   reveal. Kept entirely outside .receipt so the signature receipt stays
+   uncluttered — "reveal without cluttering the main receipt" means out,
+   not just collapsed-in-place. */
+.tab-actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.tab-action-btn{flex:1 1 0;min-width:90px;border-radius:var(--r-md);min-height:var(--tap-min);
+  padding:0 10px;cursor:pointer;font-family:'Anton',sans-serif;font-size:11.5px;letter-spacing:.03em;
+  text-transform:uppercase;background:var(--ink2);color:var(--paper);border:1px solid var(--line)}
+.tab-action-btn.primary{background:var(--amber);color:var(--ink);border:none}
+.tab-details{background:var(--ink2);border:1px solid var(--ink3);border-radius:var(--r-md);
+  padding:4px 13px;margin-top:10px;display:none}
+.tab-details.on{display:block}
+.tab-details-row{display:flex;justify-content:space-between;align-items:center;gap:10px;
+  font-size:12px;padding:8px 0;border-bottom:1px solid var(--ink3);color:var(--dim)}
+.tab-details-row:last-child{border-bottom:none}
+.tab-details-row .nm{font-weight:600;color:var(--paper);min-width:0;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.tab-details-nums{display:flex;gap:12px;flex-shrink:0;font-family:'IBM Plex Mono',monospace;font-size:11px}
 
 .fab{position:absolute;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));
   z-index:20;display:flex;gap:8px;align-items:stretch}
@@ -255,10 +389,24 @@ main::-webkit-scrollbar{width:0}
 
 .amount-display{font-family:'IBM Plex Mono',monospace;font-size:36px;font-weight:600;
   text-align:center;color:var(--amber);padding:6px 0 4px}
+.tip-toggle{display:block;margin:2px auto 12px;text-align:center}
 .tip-row{display:flex;gap:6px;justify-content:center;margin-bottom:14px;flex-wrap:wrap}
 .chip{background:var(--ink3);border:1px solid transparent;color:var(--dim);cursor:pointer;
   border-radius:var(--r-full);padding:8px 13px;font-size:12px;font-weight:600;transition:.15s}
 .chip.on{background:rgba(232,163,61,.16);border-color:var(--amber);color:var(--amber-hot)}
+.desc-field{width:100%;background:var(--ink3);border:1px solid var(--line);border-radius:10px;
+  padding:12px;color:var(--paper);font-family:'Archivo',sans-serif;font-size:16px;
+  min-height:var(--tap-min);margin-bottom:16px;transition:border-color .15s}
+.desc-field::placeholder{color:var(--dim2)}
+.desc-field:focus{outline:none;border-color:var(--amber);box-shadow:0 0 0 3px rgba(232,163,61,.28)}
+.receipt-attach-btn{width:100%;background:var(--ink3);border:1px solid var(--line);border-radius:10px;
+  min-height:var(--tap-min);padding:0 14px;margin-bottom:16px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  font-family:'Archivo',sans-serif;font-size:14px;font-weight:600;color:var(--dim)}
+.receipt-attach-btn .ico{font-size:16px}
+.receipt-attach-btn.on{border-color:var(--teal);color:var(--teal);background:rgba(61,217,176,.08)}
+.receipt-attach-btn:disabled{cursor:wait;opacity:.7}
+.receipt-view-img{max-width:100%;max-height:60vh;border-radius:var(--r-md);display:block}
 .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
 .pad button{background:var(--ink3);border:none;color:var(--paper);border-radius:var(--r-md);padding:16px 0;
   font-family:'IBM Plex Mono',monospace;font-size:23px;cursor:pointer}
@@ -319,7 +467,7 @@ main::-webkit-scrollbar{width:0}
 .toast.err{background:var(--magenta);color:#fff}
 .toast.actionable{pointer-events:auto}
 .toast-action{background:rgba(0,0,0,.16);border:none;color:inherit;border-radius:7px;
-  padding:6px 10px;min-height:32px;font-size:11px;font-weight:700;letter-spacing:.03em;
+  padding:6px 10px;min-height:36px;font-size:11px;font-weight:700;letter-spacing:.03em;
   text-transform:uppercase;cursor:pointer;flex-shrink:0}
 
 .overlay{position:absolute;inset:0;z-index:60;background:var(--ink);display:none;
@@ -330,14 +478,14 @@ main::-webkit-scrollbar{width:0}
 .overlay .sub{font-size:14px;line-height:1.55;color:var(--dim);max-width:280px}
 .overlay code{background:var(--ink2);border:1px solid var(--line);border-radius:6px;padding:2px 6px;
   color:var(--amber-hot);font-size:10.5px}
-.field-label{width:100%;max-width:260px;text-align:left;font-size:12px;font-weight:600;color:var(--dim);
+.field-label{display:block;width:100%;max-width:260px;text-align:left;font-size:12px;font-weight:600;color:var(--dim);
   margin:8px 0 -6px 2px}
 .overlay input{width:100%;max-width:260px;background:var(--ink2);border:1px solid var(--line);
   border-radius:var(--r-md);padding:13px;color:var(--paper);min-height:var(--tap-min);
   font-size:16px;transition:border-color .15s}
-.overlay input.code-field{font-family:'IBM Plex Mono',monospace;text-align:center;letter-spacing:.3em;font-weight:600}
+.overlay input.code-field{font-family:'IBM Plex Mono',monospace;text-align:center;letter-spacing:.12em;font-weight:600}
 .overlay input::placeholder{color:var(--dim2)}
-.overlay input:focus{outline:none;border-color:var(--amber)}
+.overlay input:focus{outline:none;border-color:var(--amber);box-shadow:0 0 0 3px rgba(232,163,61,.28)}
 .overlay input.input-error{border-color:var(--magenta)}
 .field-error{width:100%;max-width:260px;text-align:left;font-size:12px;color:var(--magenta);margin:-4px 0 0 2px}
 .overlay button{background:var(--amber);color:var(--ink);border:none;border-radius:var(--r-md);
@@ -365,6 +513,11 @@ main::-webkit-scrollbar{width:0}
 .brand-tag{font-family:'Archivo',sans-serif;font-size:12px;font-weight:500;color:var(--dim);
   text-transform:none;letter-spacing:.01em;margin-top:5px}
 
+.guide-list{width:100%;max-width:280px;text-align:left;display:flex;flex-direction:column;
+  gap:12px;margin:6px 0 18px}
+.guide-item{font-size:13px;line-height:1.5;color:var(--dim)}
+.guide-item b{color:var(--paper)}
+
 .qr-wrap{background:var(--paper);border-radius:var(--r-md);padding:12px;
   display:inline-flex;align-self:center}
 .qr-wrap canvas{display:block;width:150px;height:150px}
@@ -377,27 +530,37 @@ main::-webkit-scrollbar{width:0}
 <div class="phone">
   <header>
     <div class="eyebrow">
-      <span id="hdrTitle">—</span>
+      <span class="eyebrow-left">
+        <span id="hdrTitle">—</span>
+        <button class="info-btn" id="btnInfo" aria-label="How this app works" title="How this app works">i</button>
+      </span>
       <span class="live offline" id="liveTag"><span class="dot"></span>Connecting…</span>
     </div>
-    <h1>Last Call</h1>
+    <div id="hdrBrand"></div>
+    <div class="hdr-context" id="hdrContext" style="display:none"></div>
     <div class="totals">
       <div class="tot-block"><div class="tot-lbl">Night total</div><div class="tot-big" id="hdrTotal">$0.00</div></div>
-      <div class="tot-block"><div class="tot-lbl">Your tab</div><div class="tot-sub" id="hdrYou">$0.00</div></div>
-      <div class="tot-block"><div class="tot-lbl">Active</div><div class="tot-sub" id="hdrOut">0 / 0</div></div>
+      <div class="tot-block"><div class="tot-lbl">Your share</div><div class="tot-sub" id="hdrYou">$0.00</div></div>
+      <div class="tot-block"><div class="tot-lbl">Still out</div><div class="tot-sub" id="hdrOut">0 of 0</div></div>
     </div>
   </header>
 
   <nav role="tablist">
-    <button role="tab" aria-selected="true" data-tab="tonight">Tonight</button>
-    <button role="tab" aria-selected="false" data-tab="crew">Crew</button>
-    <button role="tab" aria-selected="false" data-tab="tab">The Tab</button>
+    <button role="tab" id="tab-tonight" aria-selected="true" aria-controls="pane-tonight" data-tab="tonight">Tonight</button>
+    <button role="tab" id="tab-crew" aria-selected="false" aria-controls="pane-crew" data-tab="crew">Crew</button>
+    <button role="tab" id="tab-tab" aria-selected="false" aria-controls="pane-tab" data-tab="tab">The Tab</button>
   </nav>
 
   <main>
-    <section class="pane on" id="pane-tonight"></section>
-    <section class="pane" id="pane-crew"></section>
-    <section class="pane" id="pane-tab"></section>
+    <div class="hdr-compact" id="hdrCompact" aria-hidden="true">
+      <span class="hdr-compact-mark" id="hdrCompactMark"></span>
+      <span class="hdr-compact-word">Last Call</span>
+      <span class="hdr-compact-total" id="hdrCompactTotal">$0.00</span>
+      <span class="hdr-compact-live" id="hdrCompactLive"><span class="dot"></span>Live</span>
+    </div>
+    <section class="pane on" id="pane-tonight" role="tabpanel" aria-labelledby="tab-tonight"></section>
+    <section class="pane" id="pane-crew" role="tabpanel" aria-labelledby="tab-crew"></section>
+    <section class="pane" id="pane-tab" role="tabpanel" aria-labelledby="tab-tab"></section>
   </main>
 
   <div class="fab" id="fab" style="display:none">
@@ -406,7 +569,7 @@ main::-webkit-scrollbar{width:0}
     <button class="fab-last" id="btnLastCallFab">Last Call</button>
   </div>
 
-  <div class="toast" id="toast"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
   <div class="scrim" id="scrim"></div>
 
   <div class="sheet" id="sheet">
@@ -418,14 +581,21 @@ main::-webkit-scrollbar{width:0}
     <button class="link" id="toggleKind" style="padding:0;margin-bottom:14px"></button>
     <div class="section-lbl">Paid by</div>
     <div class="who" id="payerRow"></div>
-    <div class="amount-display" id="amtDisp"></div>
-    <div class="tip-row" id="tipRow">
+    <div class="amount-display" id="amtDisp" aria-live="polite"></div>
+    <button class="link tip-toggle" id="tipToggle" style="padding:0"></button>
+    <div class="tip-row" id="tipRow" style="display:none">
       <button class="chip on" data-tip="0">No tip</button>
       <button class="chip" data-tip="18">18%</button>
       <button class="chip" data-tip="20">20%</button>
       <button class="chip" data-tip="25">25%</button>
     </div>
     <div class="pad" id="pad"></div>
+    <label class="field-label" for="expDesc" style="max-width:none;margin:0 0 6px">Note (optional)</label>
+    <input id="expDesc" class="desc-field" placeholder="e.g. Margaritas at Marlowe's" maxlength="80">
+    <input type="file" id="receiptFile" accept="image/*" capture="environment" style="display:none">
+    <button class="receipt-attach-btn" id="receiptAttachBtn" type="button">
+      <span class="ico" aria-hidden="true">📷</span><span id="receiptAttachLabel">Attach Receipt</span>
+    </button>
     <div class="section-lbl">Splitting between</div>
     <div class="who" id="splitRow"></div>
     <div class="auto-note" id="autoNote"></div>
@@ -447,7 +617,7 @@ main::-webkit-scrollbar{width:0}
       <h2>We moved</h2>
       <p class="hint">Name it if you know it — you can rename later. Leave it blank and it'll just be "Stop N".</p>
     </div>
-    <input id="stopName" placeholder="e.g. Marlowe's" maxlength="60"
+    <input id="stopName" aria-label="Stop name" placeholder="e.g. Marlowe's" maxlength="60"
       style="width:100%;background:var(--ink3);border:1px solid var(--line);border-radius:10px;
         padding:12px;color:var(--paper);font-family:'Archivo';font-size:16px;margin-bottom:14px">
     <button class="confirm" id="stopGo">Log the move</button>
@@ -483,6 +653,13 @@ const SUPABASE_URL  = 'https://rkxmpvkhrchgkqocguwt.supabase.co';
 const PUBLISHABLE   = 'sb_publishable_vF8xIr2yzxZRk_ozdHT-bQ_kcOiAEel';
 const DUST_CENTS    = 200;           // $2 materiality threshold
 
+// No settings framework exists in this app yet — this is the single flag
+// that gates the receipt's personality lines (Rounds bought / Most
+// generous / Cheapest date). Flip to false to drop them without touching
+// renderTab()'s structure. Does NOT gate the closing tagline ("THAT'S LAST
+// CALL, FOLKS") — that's signature receipt chrome, not a "stat."
+const PLAYFUL_SUMMARIES = true;
+
 const sb = createClient(SUPABASE_URL, PUBLISHABLE);
 
 /* ============================================================
@@ -492,7 +669,7 @@ const sb = createClient(SUPABASE_URL, PUBLISHABLE);
    anywhere without circular-dependency risk.
    ============================================================ */
 const $  = s => document.querySelector(s);
-const money  = c => '$' + (c/100).toFixed(2);
+const money  = c => (c/100).toLocaleString('en-US', { style:'currency', currency:'USD' });
 const money0 = c => '$' + Math.round(c/100).toLocaleString();
 const clock  = ts => new Date(ts).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
 const initials = n => (n||'?').slice(0,2).toUpperCase();
@@ -520,19 +697,31 @@ async function shareInvite(code, title){
 const PALETTE = ['#E8A33D','#FF4D8D','#3DD9B0','#8B7BFF','#FF8A5B','#6D9EEB','#F2C960'];
 const colorFor = id => PALETTE[[...id].reduce((a,c)=>a+c.charCodeAt(0),0) % PALETTE.length];
 
+// Escapes free-typed user text before it goes into an innerHTML template.
+// display_name/note/stop-name elsewhere in the app are short, server- or
+// UI-constrained strings; the round description is the first genuinely
+// open-ended, arbitrary-length field a person can type, so it gets this
+// treatment specifically.
+const escapeHtml = s => (s ?? '').replace(/[&<>"']/g, c => ({
+  '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+}[c]));
+
 /* ============================================================
-   BRAND — logo mark + wordmark + tagline. Used only on the
-   join/start landing overlay (see app.js promptJoin()) — the one
-   "hero" moment; deliberately not repeated on every sub-screen.
+   BRAND — logo mark, wordmark, tagline.
+   - brandBlock(): logo + wordmark + tagline. Used on the join/start
+     landing overlay (the one "hero" moment) and the info guide.
+   - headerBrand(): logo + wordmark only, sized down, wrapped in the
+     page's one <h1> — used in the persistent app header.
    ============================================================ */
 
 // Logo mark — circular arrows (the "session recirculates" motif) around an
 // L/C monogram. Inline SVG rather than an asset file, so it inherits the
-// palette without an extra request and never asks for image handoff.
+// palette without an extra request. Same markup everywhere it appears;
+// only the wrapper class changes so CSS can size it per context.
 // Hex values hardcoded rather than var(--...) — presentation attributes on
 // <stop>/<text> don't reliably resolve custom properties across browsers
 // when the SVG is injected as an innerHTML string.
-const LC_MARK = `<svg viewBox="0 0 100 100" class="lc-mark" aria-hidden="true">
+const lcMark = (cls) => `<svg viewBox="0 0 100 100" class="${cls}" aria-hidden="true">
   <defs>
     <linearGradient id="lcGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#E8A33D"/>
@@ -551,11 +740,25 @@ const LC_MARK = `<svg viewBox="0 0 100 100" class="lc-mark" aria-hidden="true">
 
 const brandBlock = () => `
   <div class="brand">
-    ${LC_MARK}
+    ${lcMark('lc-mark')}
     <div>
       <div class="brand-word">Last Call</div>
       <div class="brand-tag">One night out&nbsp; · &nbsp;Zero confusion.</div>
     </div>
+  </div>`;
+
+// Bare mark only, for the compact scroll-reminder bar — sizing is handled
+// entirely by that bar's own CSS container, not a dedicated class here.
+const compactMark = () => lcMark('');
+
+// Compact version for the persistent app header — logo + wordmark, no
+// tagline (repeating the tagline on every screen would dilute it; it
+// stays on the landing overlay and the info guide). Keeps the page's
+// single <h1> for document structure instead of a plain <div>.
+const headerBrand = () => `
+  <div class="hdr-brand">
+    ${lcMark('lc-mark-sm')}
+    <h1 class="hdr-brand-word">Last Call</h1>
   </div>`;
 
 
@@ -582,7 +785,9 @@ let stops = [];
 let expenses = [];          // with allocations attached
 let balances = [];
 let plan = [];              // settle_night rows
-let settledLocal = new Set();
+let crewIntroOpen = false;  // Crew intro card starts collapsed; <details> loses
+                             // its own open state whenever we rebuild the pane's
+                             // innerHTML, so this is the real source of truth.
 
 
 const M   = id => members.find(m => m.person_id === id);
@@ -667,9 +872,9 @@ function promptJoin(code){
   $('#ovTitle').innerHTML = brandBlock();
   $('#ovBody').innerHTML = `
     <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px;width:100%">
-      <div class="field-label">Invite code</div>
+      <label class="field-label" for="joinCode">Invite code</label>
       <input id="joinCode" class="code-field" value="${code}" placeholder="e.g. LASTCALL" maxlength="12" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false">
-      <div class="field-label">Your name</div>
+      <label class="field-label" for="joinName">Your name</label>
       <input id="joinName" placeholder="e.g. Sam" maxlength="24" autocomplete="name">
       <div class="field-error" id="joinErr" style="display:none"></div>
       <button id="joinGo" style="margin-top:4px">Join Night</button>
@@ -730,7 +935,7 @@ function promptSignIn(){
   overlay('Sign in', 'Get back into an account you\'ve already linked an email to.');
   $('#ovBody').innerHTML = `
     <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px;width:100%">
-      <div class="field-label">Email</div>
+      <label class="field-label" for="signInEmail">Email</label>
       <input id="signInEmail" type="email" placeholder="you@example.com" autocomplete="email">
       <div class="field-error" id="signInErr" style="display:none"></div>
       <button id="sendSignIn" style="margin-top:4px">Send Sign-In Link</button>
@@ -769,11 +974,13 @@ function promptStart(){
   overlay('Start a Night Out', 'Give it a name — or skip and we\'ll date-stamp it.');
   $('#ovBody').innerHTML = `
     <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px;width:100%">
-      <div class="field-label">Your name</div>
+      <label class="field-label" for="hostName">Your name</label>
       <input id="hostName" placeholder="e.g. Rick" maxlength="24" autocomplete="name"
         value="${me.display_name && me.display_name !== 'Guest' ? me.display_name : ''}">
-      <div class="field-label">Night name (optional)</div>
+      <label class="field-label" for="nightTitle">Night name (optional)</label>
       <input id="nightTitle" placeholder="e.g. Dave's Birthday" maxlength="60">
+      <label class="field-label" for="startStopName">Where does the night begin? (optional)</label>
+      <input id="startStopName" placeholder="e.g. Marlowe's" maxlength="60">
       <button id="createGo" style="margin-top:4px">Create Night</button>
       <button class="secondary" id="backToJoin">Back</button>
     </div>`;
@@ -792,6 +999,18 @@ function promptStart(){
     const row = Array.isArray(data) ? data[0] : data;
     const { data: person } = await sb.from('person').select('*').eq('id', me.id).single();
     if(person) me = person;
+
+    // create_night() already auto-creates Stop 1 (unnamed) server-side —
+    // this just names it, same table/RLS path "We moved" already uses to
+    // create later stops. Not fatal if it fails: the night's already
+    // created either way, this is a nice-to-have, not a blocker.
+    const stopName = $('#startStopName').value.trim();
+    if(stopName){
+      const { error: stopErr } = await sb.from('stop')
+        .update({ name: stopName }).eq('night_id', row.night_id).eq('seq', 1);
+      if(stopErr) console.error('Could not name the first stop:', stopErr);
+    }
+
     showNightCreated(row.night_id, row.join_code);
   };
   $('#backToJoin').onclick = () => promptJoin(new URLSearchParams(location.search).get('code') || '');
@@ -864,8 +1083,8 @@ async function refreshPlan(){
     const { data, error } = await sb.from('settlement').select('*').eq('night_id', night.id);
     if(error){ console.error(error); plan = []; return; }
     plan = (data || []).map(s => ({
-      from_person: s.from_person, to_person: s.to_person,
-      amount_cents: s.amount_cents, is_dust: false
+      id: s.id, from_person: s.from_person, to_person: s.to_person,
+      amount_cents: s.amount_cents, is_dust: false, status: s.status
     }));
     return;
   }
@@ -934,8 +1153,31 @@ function renderHeader(){
   // rounder. The header must never disagree with the numbers below it.
   $('#hdrTotal').textContent = money(grand);
   $('#hdrYou').textContent   = money(mine?.owed_cents ?? 0);
-  $('#hdrOut').textContent   = `${activeCount} / ${members.length}`;
+  $('#hdrOut').textContent   = `${activeCount} of ${members.length}`;
   $('#fab').style.display    = isOpen() ? 'flex' : 'none';
+
+  // Compact reminder bar — same grand total, same open/closed state, no
+  // second source of truth. Text content only; visibility is driven
+  // purely by scroll position (see the listener set up once, below).
+  $('#hdrCompactTotal').textContent = money(grand);
+  const compactLive = $('#hdrCompactLive');
+  compactLive.className = 'hdr-compact-live' + (isOpen() ? '' : ' closed');
+  compactLive.innerHTML = `<span class="dot"></span>${isOpen() ? 'Live' : 'Closed'}`;
+
+  // Optional one-line orientation ("STOP 2 · 3 ROUNDS") — only shown once
+  // a stop genuinely exists, using data already fetched for the Tonight
+  // tab (no separate query). Never a placeholder: hidden entirely if
+  // there's nothing to say yet.
+  const hc = $('#hdrContext');
+  if(stops.length){
+    const latest = stops[stops.length - 1];
+    const roundsHere = expenses.filter(e =>
+      e.stop_id === latest.id && e.kind === 'round' && e.status !== 'disputed').length;
+    hc.textContent = `Stop ${stops.length} · ${roundsHere} round${roundsHere===1?'':'s'}`;
+    hc.style.display = 'block';
+  } else {
+    hc.style.display = 'none';
+  }
 
   const lcFab = $('#btnLastCallFab');
   if(lcFab){
@@ -983,7 +1225,7 @@ function renderTonight(){
           : uneven ? `${participants} participants · uneven split`
           : `${participants} participants`;
         const stopLabel = s.name ?? 'Stop ' + (i+1);
-        return `<div class="exp ${e.status}" ${isOpen() ? `data-edit="${e.id}"` : ''}>
+        return `<div class="exp ${e.status}" ${isOpen() ? `data-edit="${e.id}" role="button" tabindex="0"` : ''}>
           ${avatar(e.payer_id)}
           <div class="exp-mid">
             <div class="exp-head">
@@ -991,9 +1233,17 @@ function renderTonight(){
               ${e.status==='disputed' ? '<span class="exp-flagtag">Flagged</span>' : ''}
             </div>
             <div class="exp-meta">${nameOf(e.payer_id)} paid · ${participantPhrase}</div>
+            ${e.description ? `<div class="exp-desc">${escapeHtml(e.description)}</div>` : ''}
             <div class="exp-sub">${clock(e.occurred_at)} · ${stopLabel}${e.tip_cents ? ` · ${money(e.tip_cents)} tip` : ''}</div>
           </div>
-          <div class="exp-amt-col"><div class="exp-amt">${money(totalOf(e))}</div></div>
+          <div class="exp-amt-col">
+            <div class="exp-amt">${money(totalOf(e))}</div>
+            <button class="receipt-btn ${e.receipt_url?'on':''}" data-receipt="${e.receipt_url?e.id:''}"
+              aria-label="${e.receipt_url ? 'View attached receipt photo' : 'No receipt attached'}"
+              title="${e.receipt_url ? 'View receipt' : 'No receipt attached'}">
+              <span aria-hidden="true">📷</span>
+            </button>
+          </div>
           <button class="flag ${e.status==='disputed'?'on':''}" data-flag="${e.id}"
             aria-label="${e.status==='disputed' ? 'Remove dispute flag — include this back in the tab' : 'Flag as disputed — hold this out of the tab'}"
             title="${e.status==='disputed' ? 'Unflag' : 'Flag as disputed'}">
@@ -1021,7 +1271,30 @@ function renderTonight(){
     if(error) return toast(error.message, true);
     toast(next === 'disputed' ? 'Flagged — held out of the tab' : 'Unflagged');
   });
-  $('#pane-tonight').querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openEdit(b.dataset.edit));
+  // Only wired when a receipt actually exists (data-receipt is empty
+  // otherwise) — with nothing attached, the tap just bubbles up to the
+  // card's own edit handler, which is exactly where attaching happens.
+  $('#pane-tonight').querySelectorAll('[data-receipt]:not([data-receipt=""])').forEach(b => b.onclick = ev => {
+    ev.stopPropagation();
+    const e = expenses.find(x => x.id === b.dataset.receipt);
+    if(e?.receipt_url) viewReceipt(e.receipt_url);
+  });
+  $('#pane-tonight').querySelectorAll('[data-edit]').forEach(b => {
+    b.onclick = () => openEdit(b.dataset.edit);
+    b.onkeydown = ev => {
+      if(ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); openEdit(b.dataset.edit); }
+    };
+  });
+}
+
+// Full-size receipt view — reuses the existing overlay() mechanism (same
+// one used for Connecting/Join/the info guide), no new modal machinery.
+function viewReceipt(url){
+  overlay('Receipt', '');
+  $('#ovBody').innerHTML = `
+    <img src="${url}" alt="Receipt photo" class="receipt-view-img">
+    <button id="receiptViewClose" style="margin-top:14px">Close</button>`;
+  $('#receiptViewClose').onclick = hideOverlay;
 }
 
 function renderCrew(){
@@ -1032,22 +1305,27 @@ function renderCrew(){
   const canLeave = !isHost() || !isOpen();
 
   $('#pane-crew').innerHTML =
-    `<div class="note-box">
-      <div class="crew-intro-head">Presence drives the split</div>
-      <p style="margin:0">People only split expenses logged while they're out.<br>Tap someone out when they leave.</p>
-      ${isHost() ? `<div class="crew-code-row">
-          <span class="crew-code-label">Join code:</span>
-          <span class="code-chip">${night.join_code}</span>
-          <button class="crew-btn primary" id="btnShareInvite">Share Invite</button>
-          <button class="crew-btn ghost" id="btnCopyCode">Copy Code</button>
-        </div>` : ''}
-      <div class="crew-host-actions">
-        <button class="crew-link" id="btnSwitchNight">Not this night? Switch</button>
-        ${canLeave
-          ? `<button class="crew-link danger" id="btnLeaveNight">Leave this night entirely</button>`
-          : `<button class="crew-link danger" id="btnCloseNight">Close the night</button>`}
+    `<details class="crew-intro" id="crewIntro" ${crewIntroOpen ? 'open' : ''}>
+      <summary class="crew-intro-summary">
+        <span class="crew-intro-head">Only pay for what you were there for</span>
+        <span class="crew-intro-hint">Join code, share &amp; exit</span>
+      </summary>
+      <div class="crew-intro-body">
+        <p style="margin:0">People only split expenses logged while they're out.<br>Tap someone out when they leave.</p>
+        ${isHost() ? `<div class="crew-code-row">
+            <span class="crew-code-label">Join code:</span>
+            <span class="code-chip">${night.join_code}</span>
+            <button class="crew-btn primary" id="btnShareInvite">Share Invite</button>
+            <button class="crew-btn ghost" id="btnCopyCode">Copy Code</button>
+          </div>` : ''}
+        <div class="crew-host-actions">
+          <button class="crew-link" id="btnSwitchNight">Not this night? Switch</button>
+          ${canLeave
+            ? `<button class="crew-link danger" id="btnLeaveNight">Leave this night entirely</button>`
+            : `<button class="crew-link danger" id="btnCloseNight">Close the night</button>`}
+        </div>
       </div>
-    </div>` +
+    </details>` +
     `<div class="section-lbl">Who was out</div>` +
     members.map(m => {
       const b = balances.find(x => x.person_id === m.person_id) ?? {paid_cents:0,owed_cents:0,net_cents:0};
@@ -1142,6 +1420,9 @@ function renderCrew(){
   // Same Last Call confirmation sheet as the fab — not a second close flow.
   const cn = $('#btnCloseNight');
   if(cn) cn.onclick = () => { if(isHost()) confirmLastCall(); };
+
+  const ci = $('#crewIntro');
+  ci.ontoggle = () => { crewIntroOpen = ci.open; };
 }
 
 function confirmSwitchNight(){
@@ -1190,67 +1471,149 @@ function renderTab(){
   const naive = expenses.filter(e=>e.status!=='disputed')
     .reduce((n,e)=> n + e.allocation.filter(a=>a.person_id!==e.payer_id).length, 0);
 
+  const final = !isOpen();
+  const stopsLine = stops.map(s=>s.name).filter(Boolean).join(' → ');
+  // Real per-payment status only exists once closed — while running, plan
+  // rows come straight from the live settle_night() preview and have no
+  // stable id to act on yet. Same reasoning for gating Pay-in-Venmo below:
+  // encouraging real money against a total that's still moving is how
+  // someone overpays a stale preview.
+  const showSettle = final && collect.some(p => p.status !== 'marked_paid');
+
   $('#pane-tab').innerHTML =
-    (isOpen() ? `<div class="preview-tag">PREVIEW · NIGHT STILL OPEN<br>
-      These numbers move as people log rounds.</div>` : '') +
     `<div class="receipt">
       <div class="r-center">
         <div class="r-title">LAST CALL</div>
-        <div class="r-muted">${isOpen()?'RUNNING TAB':'TAB CLOSED'} · ${night.title}</div>
-        <div class="r-muted">${stops.map(s=>s.name).filter(Boolean).join(' → ')}</div>
+        ${final
+          ? `<div class="r-status final">FINAL TAB</div>
+             <div class="r-status-sub">Night closed${night.closed_at ? ' at ' + clock(night.closed_at) : ''}</div>`
+          : `<div class="r-status running">RUNNING TAB</div>
+             <div class="r-status-sub">Night still open</div>`}
+        <div class="r-muted" style="margin-top:6px">${night.title}</div>
+        ${stopsLine ? `<div class="r-muted r-name" style="max-width:100%;margin:0 auto">${stopsLine}</div>` : ''}
       </div>
+      ${!final ? `<div class="r-preview-note">These numbers update as people log rounds and leave the night.</div>` : ''}
       <div class="r-rule"></div>
       <div class="r-line"><span>Subtotal</span><span>${money(grand-tips)}</span></div>
       <div class="r-line"><span>Tips</span><span>${money(tips)}</span></div>
       <div class="r-line"><b>NIGHT TOTAL</b><b>${money(grand)}</b></div>
       <div class="r-rule"></div>
-      <div class="r-center r-big">WHO PAYS WHO</div>
+      <div class="r-center r-big" id="whoPaysWhoHeading">WHO PAYS WHO</div>
       <div class="r-center r-muted" style="margin-bottom:8px">${naive} debts → ${collect.length} payment${collect.length===1?'':'s'}</div>
       ${collect.length ? collect.map((p,i) => {
-        const done = settledLocal.has(i);
+        const marked = p.status === 'marked_paid';
+        const canAct = final && p.id;
+        const iAmOwer = p.from_person === me.id;
         const handle = M(p.to_person)?.person?.venmo_handle;
-        return `<div class="r-pay ${done?'settled':''}" style="animation-delay:${i*.08}s">
-          <span><b>${nameOf(p.from_person)}</b> → ${nameOf(p.to_person)}</span><b>${money(p.amount_cents)}</b></div>
-        ${done ? '' : (p.from_person === me.id
-          ? `<a class="venmo" target="_blank" rel="noopener"
-               href="https://venmo.com/?txn=pay${handle?'&audience=private&recipients='+encodeURIComponent(handle):''}&amount=${(p.amount_cents/100).toFixed(2)}&note=${encodeURIComponent(night.title)}">Pay in Venmo</a>`
-          : `<button class="venmo" data-pay="${i}">Mark received</button>`)}`;
-      }).join('') : `<div class="r-center r-muted" style="padding:14px 0">All square.</div>`}
+        return `<div class="r-pay ${marked?'settled':''}" style="animation-delay:${i*.08}s">
+          <div class="r-pay-top">
+            <span class="r-pay-line"><b>${nameOf(p.from_person)}</b> pays <b>${nameOf(p.to_person)}</b></span>
+            <span class="r-pay-amt">${money(p.amount_cents)}</span>
+          </div>
+          <div class="r-pay-status">${marked ? 'Marked paid' : 'Unpaid'}</div>
+          ${(canAct && !marked) ? (iAmOwer
+            ? `<a class="venmo" target="_blank" rel="noopener"
+                 href="https://venmo.com/?txn=pay${handle?'&audience=private&recipients='+encodeURIComponent(handle):''}&amount=${(p.amount_cents/100).toFixed(2)}&note=${encodeURIComponent(night.title)}">Pay in Venmo</a>`
+            : `<button class="venmo" data-pay="${p.id}">Mark received</button>`) : ''}
+        </div>`;
+      }).join('') : `<div class="r-center" style="padding:10px 0">
+          <div class="r-big">ALL SQUARE</div><div class="r-muted">No payments needed.</div></div>`}
       ${dustTot ? `<div class="r-dust">Written off under $${(DUST_CENTS/100).toFixed(2)}: ${money(dustTot)}
         (${dust.map(p=>nameOf(p.from_person)).join(', ')})</div>` : ''}
       ${flagged.length ? `<div class="r-rule"></div>
-        <div class="r-muted r-center">⚑ ${flagged.length} flagged &amp; excluded</div>
-        ${flagged.map(e=>`<div class="r-line r-muted"><span>${e.note}</span><span>${money(totalOf(e))}</span></div>`).join('')}`:''}
-      <div class="r-rule"></div>
-      <div class="r-stat"><span>Rounds bought</span><span>${expenses.filter(e=>e.kind==='round').length}</span></div>
-      <div class="r-stat"><span>Most generous</span><span>${extreme(1)}</span></div>
-      <div class="r-stat"><span>Cheapest date</span><span>${extreme(-1)}</span></div>
+        <div class="r-muted r-center"><span aria-hidden="true">⚑</span> ${flagged.length} flagged &amp; excluded</div>
+        ${flagged.map(e=>`<div class="r-line r-muted"><span class="r-name">${e.note}</span><span>${money(totalOf(e))}</span></div>`).join('')}`:''}
+      ${playfulStatsHtml()}
       <div class="r-rule"></div>
       <div class="r-center r-muted">*** THAT'S LAST CALL, FOLKS ***</div>
     </div>` +
-    (!isOpen() && isHost()
+    `<div class="tab-actions">
+      <button class="tab-action-btn" id="btnShareSummary">Share Summary</button>
+      ${showSettle ? `<button class="tab-action-btn primary" id="btnSettleUp">Settle Up</button>` : ''}
+      <button class="tab-action-btn" id="btnToggleDetails">Details</button>
+    </div>` +
+    `<div class="tab-details" id="tabDetails">
+      ${balances.map(b => `<div class="tab-details-row">
+          <span class="nm">${nameOf(b.person_id)}</span>
+          <span class="tab-details-nums"><span>Paid ${money(b.paid_cents)}</span><span>Share ${money(b.owed_cents)}</span></span>
+        </div>`).join('') || `<div class="tab-details-row"><span class="nm">No one on the tab yet.</span></div>`}
+    </div>` +
+    (final && isHost()
       ? `<button class="lastcall" id="btnReopen" style="margin-top:14px;background:linear-gradient(135deg,var(--teal),#1d9e7a)">
            Reopen this night<small>ADD MORE · RE-SETTLE LATER</small></button>`
       : '');
 
-  $('#pane-tab').querySelectorAll('[data-pay]').forEach(b => b.onclick = () => {
-    settledLocal.add(+b.dataset.pay);
+  $('#pane-tab').querySelectorAll('[data-pay]').forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    const { error } = await sb.from('settlement')
+      .update({ status: 'marked_paid', marked_paid_at: new Date().toISOString() })
+      .eq('id', b.dataset.pay);
+    if(error){ b.disabled = false; return toast(error.message, true); }
+    await refreshPlan();
     toast('Marked received — we never move the money');
     renderTab();
   });
+
+  $('#btnShareSummary').onclick = () => shareTabSummary(grand, collect, final);
+
+  const su = $('#btnSettleUp');
+  if(su) su.onclick = () => {
+    const mine = collect.find(p => p.from_person === me.id && p.status !== 'marked_paid');
+    if(mine){
+      const handle = M(mine.to_person)?.person?.venmo_handle;
+      const url = `https://venmo.com/?txn=pay${handle?'&audience=private&recipients='+encodeURIComponent(handle):''}&amount=${(mine.amount_cents/100).toFixed(2)}&note=${encodeURIComponent(night.title)}`;
+      window.open(url, '_blank', 'noopener');
+    } else {
+      $('#whoPaysWhoHeading')?.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' });
+    }
+  };
+
+  $('#btnToggleDetails').onclick = () => $('#tabDetails').classList.toggle('on');
 
   const rp = $('#btnReopen');
   if(rp) rp.onclick = async () => {
     const { error } = await sb.rpc('reopen_night', { p_night_id: night.id });
     if(error) return toast(error.message, true);
-    settledLocal.clear();
     toast('Reopened — back to logging rounds');
     goTab('tonight');
   };
 }
+
+// Gates the receipt's personality stats only — see PLAYFUL_SUMMARIES in
+// config.js. The closing tagline below is signature chrome, not gated.
+function playfulStatsHtml(){
+  if(!PLAYFUL_SUMMARIES) return '';
+  return `<div class="r-rule"></div>
+    <div class="r-stat"><span>Rounds bought</span><span>${expenses.filter(e=>e.kind==='round').length}</span></div>
+    <div class="r-stat"><span>Most generous</span><span>${extreme(1)}</span></div>
+    <div class="r-stat"><span>Cheapest date</span><span>${extreme(-1)}</span></div>`;
+}
 function extreme(dir){
   const s = [...balances].sort((a,b)=> dir*(b.paid_cents - a.paid_cents))[0];
-  return s ? `${nameOf(s.person_id)} (${money0(s.paid_cents)})` : '—';
+  // money(), not money0() — every other figure on this receipt is cents-
+  // precise; this was the one place still rounding to whole dollars.
+  return s ? `${nameOf(s.person_id)} (${money(s.paid_cents)})` : '—';
+}
+const prefersReducedMotion = () =>
+  window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Deliberately minimal — names and net payment amounts only, the same
+// figures already visible to the whole group in the receipt. No Venmo
+// handles, no per-person paid/share breakdown, no join code.
+async function shareTabSummary(grand, collect, final){
+  const lines = [`${night.title} — ${final ? 'final tab' : 'running tab'}: ${money(grand)}`];
+  if(collect.length){
+    collect.forEach(p => lines.push(`${nameOf(p.from_person)} pays ${nameOf(p.to_person)}: ${money(p.amount_cents)}`));
+  } else {
+    lines.push('All square — no payments needed.');
+  }
+  const text = lines.join('\n');
+  if(navigator.share){
+    try{ await navigator.share({ title: 'Last Call', text }); return; }
+    catch(e){ if(e.name === 'AbortError') return; }
+  }
+  try{ await navigator.clipboard.writeText(text); toast('Summary copied'); }
+  catch{ toast('Could not share — try again', true); }
 }
 
 function renderAll(){ if(!night) return; renderHeader(); renderTonight(); renderCrew(); renderTab(); }
@@ -1306,9 +1669,9 @@ async function doLastCall(){
 let draft = null;
 const baseOf = () => draft.editing ? draft.base : parseInt(draft.digits || '0', 10);
 const tipOf  = () => {
-  const b = baseOf();
   if(draft.editing) return draft.fixedTip;
-  return Math.round(b * draft.tip / 100);
+  if(!draft.tipMode) return 0;
+  return Math.round(baseOf() * draft.tip / 100);
 };
 const wSum = () => draft.alloc.reduce((s,a)=>s+a.w, 0);
 
@@ -1319,7 +1682,7 @@ function eligible(kind, at){
 function applyKindLabels(){
   $('#shTitle').textContent = draft.kind === 'round' ? "Who's buying?" : 'Log an expense';
   $('#shHint').textContent  = draft.kind === 'round'
-    ? 'Split defaults to whoever is out right now, minus anyone not drinking.'
+    ? 'Split defaults to whoever is out right now, minus anyone off rounds.'
     : "Cover, cab, coat check, cash tip — anything that isn't a round.";
   $('#toggleKind').textContent = draft.kind === 'round'
     ? 'Not a round? Log something else instead'
@@ -1328,7 +1691,8 @@ function applyKindLabels(){
 
 function openAdd(kind){
   const at = new Date();
-  draft = { editing:null, kind, payer: me.id, digits:'', tip: 0,
+  draft = { editing:null, kind, payer: me.id, digits:'', tip: 0, tipMode:false, description:'',
+            receiptUrl: null,
             showShares:false, at, alloc: eligible(kind, at).map(p => ({p, w:1})) };
   applyKindLabels();
   $('#toggleKind').style.display = 'block';
@@ -1340,10 +1704,11 @@ function openEdit(id){
   if(!isOpen()) return toast('Tab is closed', true);
   const e = expenses.find(x => x.id === id);
   draft = { editing:id, kind:e.kind, payer:e.payer_id, base:e.base_cents, fixedTip:e.tip_cents,
+            description: e.description || '', receiptUrl: e.receipt_url || null,
             showShares: e.allocation.some(a => Number(a.weight) !== 1), at: new Date(e.occurred_at),
             alloc: e.allocation.map(a => ({ p:a.person_id, w:Number(a.weight) })) };
   $('#shTitle').textContent = 'Edit expense';
-  $('#shHint').textContent = `${e.note ?? 'Expense'} · logged ${clock(e.occurred_at)}. Drop someone out or give them a bigger share.`;
+  $('#shHint').textContent = `${e.note ?? 'Expense'}${e.description ? ' — ' + e.description : ''} · logged ${clock(e.occurred_at)}. Drop someone out or give them a bigger share.`;
   $('#toggleKind').style.display = 'none';
   $('#pad').style.display = 'none';
   $('#voidBtn').style.display = 'block';
@@ -1404,16 +1769,37 @@ function renderSheet(){
   $('#payerRow').querySelectorAll('[data-payer]').forEach(b => b.onclick = () => { draft.payer = b.dataset.payer; renderSheet(); });
 
   const tot = baseOf() + tipOf(), W = wSum() || 1;
+  const sub = draft.tipMode
+    ? `${money(baseOf())} + ${money(tipOf())} tip${draft.alloc.length?` · ${money(Math.round(tot/W))}/share`:''}`
+    : (draft.alloc.length ? `${money(Math.round(tot/W))}/share` : 'total');
   $('#amtDisp').innerHTML = tot
-    ? `${money(tot)}<span style="font-size:12px;color:var(--dim2);display:block;margin-top:2px">
-        ${money(baseOf())} + ${money(tipOf())} tip${draft.alloc.length?` · ${money(Math.round(tot/W))}/share`:''}</span>`
+    ? `${money(tot)}<span style="font-size:12px;color:var(--dim2);display:block;margin-top:2px">${sub}</span>`
     : `$0.00<span style="font-size:12px;color:var(--dim2);display:block;margin-top:2px">tap the keypad</span>`;
 
-  $('#tipRow').style.display = draft.editing ? 'none' : 'flex';
+  // Total-first by default — most people just know what they paid.
+  // The tip calculator is opt-in for anyone who'd rather work from a
+  // subtotal + tip%; switching modes clears the digits so a typed
+  // total is never silently reinterpreted as a subtotal (or vice versa).
+  $('#tipToggle').style.display = draft.editing ? 'none' : 'block';
+  $('#tipToggle').textContent = draft.tipMode ? 'Enter total directly' : '+ Calculate a tip';
+  $('#tipToggle').onclick = () => {
+    draft.tipMode = !draft.tipMode;
+    draft.digits = '';
+    draft.tip = 0;
+    renderSheet();
+  };
+  $('#tipRow').style.display = (!draft.editing && draft.tipMode) ? 'flex' : 'none';
   $('#tipRow').querySelectorAll('.chip').forEach(c => {
     c.classList.toggle('on', String(draft.tip) === c.dataset.tip);
     c.onclick = () => { draft.tip = +c.dataset.tip; renderSheet(); };
   });
+
+  $('#expDesc').value = draft.description || '';
+  $('#expDesc').oninput = e => { draft.description = e.target.value; };
+
+  const rBtn = $('#receiptAttachBtn'), rLbl = $('#receiptAttachLabel');
+  rBtn.classList.toggle('on', !!draft.receiptUrl);
+  rLbl.textContent = draft.receiptUrl ? 'Receipt attached · Tap to replace' : 'Attach Receipt';
 
   const inSplit = id => draft.alloc.some(a => a.p === id);
   $('#splitRow').innerHTML = members.map(m => `
@@ -1429,7 +1815,7 @@ function renderSheet(){
   const dry  = members.filter(m => m.is_dry && presentAt(m, at));
   const bits = [];
   if(away.length) bits.push(`${away.map(m=>m.person.display_name).join(', ')} not here — excluded automatically.`);
-  if(dry.length && draft.kind === 'round') bits.push(`${dry.map(m=>m.person.display_name).join(', ')} not drinking — off this round.`);
+  if(dry.length && draft.kind === 'round') bits.push(`${dry.map(m=>m.person.display_name).join(', ')} off rounds — skipped automatically.`);
   $('#autoNote').textContent = bits.join(' ');
 
   $('#tglShares').textContent = draft.showShares ? 'Even split' : 'Uneven shares';
@@ -1458,7 +1844,10 @@ function renderSheet(){
 }
 
 $('#pad').innerHTML = ['1','2','3','4','5','6','7','8','9','·','0','⌫']
-  .map(k => `<button data-k="${k}">${k}</button>`).join('');
+  .map(k => {
+    const label = k === '·' ? 'double zero' : k === '⌫' ? 'backspace' : k;
+    return `<button data-k="${k}" aria-label="${label}">${k}</button>`;
+  }).join('');
 $('#pad').querySelectorAll('button').forEach(b => b.onclick = () => {
   const k = b.dataset.k;
   if(k === '⌫') draft.digits = draft.digits.slice(0,-1);
@@ -1471,6 +1860,35 @@ $('#selPresent').onclick = () => { draft.alloc = eligible(draft.kind, draft.at).
 $('#selAll').onclick     = () => { draft.alloc = members.map(m=>({p:m.person_id,w:1})); renderSheet(); };
 $('#selNone').onclick    = () => { draft.alloc = []; renderSheet(); };
 $('#tglShares').onclick  = () => { if(draft.showShares) draft.alloc.forEach(a=>a.w=1); draft.showShares=!draft.showShares; renderSheet(); };
+$('#receiptAttachBtn').onclick = () => $('#receiptFile').click();
+$('#receiptFile').onchange = async e => {
+  const file = e.target.files[0];
+  e.target.value = ''; // allow re-selecting the same file later (e.g. after removing)
+  if(!file) return;
+  if(file.size > 10 * 1024 * 1024) return toast('That photo is too large (10MB max)', true);
+
+  const rBtn = $('#receiptAttachBtn'), rLbl = $('#receiptAttachLabel');
+  rBtn.disabled = true;
+  rLbl.textContent = 'Uploading…';
+
+  // Path is namespaced by night, not by expense — for a brand-new
+  // expense we don't have an expense id yet at upload time. A random
+  // filename is enough; the bucket is public (see KNOWLEDGE.md), so the
+  // path itself isn't relied on for access control.
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().slice(0, 5);
+  const path = `${night.id}/${crypto.randomUUID()}.${ext}`;
+  const { error: upErr } = await sb.storage.from('receipts').upload(path, file);
+  if(upErr){
+    rBtn.disabled = false;
+    renderSheet();
+    return toast(upErr.message, true);
+  }
+  const { data: pub } = sb.storage.from('receipts').getPublicUrl(path);
+  draft.receiptUrl = pub.publicUrl;
+  rBtn.disabled = false;
+  renderSheet();
+  toast('Receipt attached');
+};
 $('#btnRound').onclick   = () => openAdd('round');
 $('#btnLastCallFab').onclick = () => { if(isHost()) confirmLastCall(); };
 $('#btnStop').onclick    = () => openNewStop();
@@ -1502,7 +1920,10 @@ $('#confirmBtn').onclick = async () => {
   $('#confirmBtn').disabled = true;
 
   if(draft.editing){
-    const { error: e1 } = await sb.from('expense').update({ payer_id: draft.payer }).eq('id', draft.editing);
+    const { error: e1 } = await sb.from('expense')
+      .update({ payer_id: draft.payer, description: draft.description?.trim() || null,
+                 receipt_url: draft.receiptUrl || null })
+      .eq('id', draft.editing);
     if(e1){ close(); return toast(e1.message, true); }
     await sb.from('allocation').delete().eq('expense_id', draft.editing);
     const { error: e2 } = await sb.from('allocation').insert(
@@ -1517,6 +1938,8 @@ $('#confirmBtn').onclick = async () => {
     night_id: night.id, stop_id: stop?.id ?? null, payer_id: draft.payer,
     base_cents: baseOf(), tip_cents: tipOf(), kind: draft.kind,
     note: draft.kind === 'round' ? `Round ${n}` : 'Expense',
+    description: draft.description?.trim() || null,
+    receipt_url: draft.receiptUrl || null,
     created_by: me.id
   }).select().single();
 
@@ -1555,6 +1978,7 @@ function toast(msg, isErr = false, action = null){
     t.textContent = msg;
   }
   t.className = 'toast on' + (isErr ? ' err' : '') + (action ? ' actionable' : '');
+  t.setAttribute('aria-live', isErr ? 'assertive' : 'polite');
   clearTimeout(tT);
   tT = setTimeout(() => t.className = 'toast', action ? 4200 : 3200);
 }
@@ -1565,6 +1989,45 @@ function overlay(title, sub){
   $('#overlay').classList.add('on');
 }
 function hideOverlay(){ $('#overlay').classList.remove('on'); }
+
+// Quick guide — reuses the same overlay used for Connecting/Join/etc.
+// Just shows/hides on top of whatever's already rendered underneath;
+// doesn't touch night/members/expenses state, so it's safe to open
+// mid-session and dismiss back into exactly where you were.
+function showGuide(){
+  overlay('', 'A quick guide to how this works.');
+  $('#ovTitle').innerHTML = brandBlock();
+  $('#ovBody').innerHTML = `
+    <div class="guide-list">
+      <div class="guide-item"><b>Presence drives the split.</b> Tap someone out when they leave — new rounds skip them automatically.</div>
+      <div class="guide-item"><b>Add Round</b> when someone buys. The split defaults to whoever's here.</div>
+      <div class="guide-item"><b>Add Stop</b> when the group moves to a new place.</div>
+      <div class="guide-item"><b>Last Call</b> closes the night and works out who pays who.</div>
+      <div class="guide-item">Everything updates live for the whole group.</div>
+    </div>
+    <button id="guideClose" style="margin-top:6px">Got it</button>`;
+  $('#guideClose').onclick = hideOverlay;
+}
+$('#btnInfo').onclick = showGuide;
+
+$('#hdrBrand').innerHTML = headerBrand();
+$('#hdrCompactMark').innerHTML = compactMark();
+
+// Compact bar visibility — sticky positioning is free (CSS handles it);
+// this only ever toggles a class. Hysteresis (show >90px, hide <60px)
+// so it doesn't flicker in/out right at one fixed line. Also self-resets
+// correctly on tab switches, since switching tabs already does
+// main.scrollTop = 0, which fires this same 'scroll' event.
+{
+  const mainEl = $('main');
+  const compactBar = $('#hdrCompact');
+  let compactShown = false;
+  mainEl.addEventListener('scroll', () => {
+    const y = mainEl.scrollTop;
+    if(!compactShown && y > 90){ compactShown = true; compactBar.classList.add('show'); }
+    else if(compactShown && y < 60){ compactShown = false; compactBar.classList.remove('show'); }
+  }, { passive: true });
+}
 
 boot().catch(e => overlay('Something broke', e.message));
 

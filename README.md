@@ -16,10 +16,17 @@ release to release.
 ```
 index.html          shell markup only — no inline CSS or JS
 styles.css           full stylesheet
+manifest.json        PWA manifest — name, icons, standalone display
+icons/               real app logo exported as favicon/apple-touch-icon/
+                     manifest icons (icon.svg + PNGs at 16/32/180/192/512px)
 js/
-  config.js          Supabase client + constants (URL, publishable key, dust threshold)
+  config.js          Supabase client + constants (URL, publishable key, dust threshold, playful-summaries flag)
   utils.js           pure formatting/sharing helpers — no app state, safe to import anywhere
-  brand.js           logo mark + wordmark block (landing screen only)
+  brand.js           logo mark + wordmark: brandBlock() (with tagline, for the
+                     landing overlay and info guide), headerBrand() (compact,
+                     no tagline, for the persistent header, wraps the page's
+                     one <h1>), and compactMark() (bare mark only, for the
+                     scroll-reminder bar)
   qr.js               QR-code rendering — the app's one point of contact with the qrcode dependency
   app.js              state, auth/boot, rendering, sheets, realtime sync — the stateful "core"
 ```
@@ -47,6 +54,15 @@ python3 -m http.server 8080
 Then open the printed `localhost` URL. Double-clicking `index.html` will
 load styling but the app itself won't boot (no Supabase connection).
 
+## Icons / PWA
+
+`icons/icon.svg` is generated directly from the same SVG markup used by
+`js/brand.js`'s logo mark (ink background added, centered, scaled up) — not
+a separately hand-drawn asset, so the two can't visually drift apart. The
+PNGs were rendered from it via `cairosvg`. If the logo design changes,
+regenerate both from the updated markup rather than editing the PNGs by
+hand.
+
 ## Deploying
 
 Deployed to Netlify — no build command, publish directory is the repo root.
@@ -58,3 +74,7 @@ project on the same account that this one is *not*.
 Supabase project `last-call`. See KNOWLEDGE.md for schema, RPCs, and the
 architectural decisions (derived balances, anonymous auth, settlement
 snapshots, etc.) that shape how the code is written.
+
+One Storage bucket, `receipts` (public, 10MB cap), for attached receipt
+photos. See KNOWLEDGE.md for the access-control tradeoff that comes with
+"public."

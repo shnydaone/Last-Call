@@ -5,7 +5,7 @@
    anywhere without circular-dependency risk.
    ============================================================ */
 export const $  = s => document.querySelector(s);
-export const money  = c => '$' + (c/100).toFixed(2);
+export const money  = c => (c/100).toLocaleString('en-US', { style:'currency', currency:'USD' });
 export const money0 = c => '$' + Math.round(c/100).toLocaleString();
 export const clock  = ts => new Date(ts).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
 export const initials = n => (n||'?').slice(0,2).toUpperCase();
@@ -32,3 +32,12 @@ export async function shareInvite(code, title){
 
 export const PALETTE = ['#E8A33D','#FF4D8D','#3DD9B0','#8B7BFF','#FF8A5B','#6D9EEB','#F2C960'];
 export const colorFor = id => PALETTE[[...id].reduce((a,c)=>a+c.charCodeAt(0),0) % PALETTE.length];
+
+// Escapes free-typed user text before it goes into an innerHTML template.
+// display_name/note/stop-name elsewhere in the app are short, server- or
+// UI-constrained strings; the round description is the first genuinely
+// open-ended, arbitrary-length field a person can type, so it gets this
+// treatment specifically.
+export const escapeHtml = s => (s ?? '').replace(/[&<>"']/g, c => ({
+  '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+}[c]));

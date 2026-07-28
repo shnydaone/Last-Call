@@ -17,15 +17,18 @@ realtime via Supabase.
 ```
 index.html          shell markup only
 styles.css           full stylesheet
+manifest.json        PWA manifest (name, icons, standalone display)
+icons/               real logo, exported as favicon/apple-touch-icon/PWA icons
 js/
   config.js          Supabase client + constants
   utils.js           pure formatting/sharing helpers (no app state)
-  brand.js           logo mark + wordmark (landing screen only)
+  brand.js           logo mark + wordmark — landing overlay, info guide,
+                     and a compact header variant (headerBrand())
   qr.js               QR-code rendering, wraps the qrcode dependency
   app.js              state, auth/boot, rendering, sheets, realtime sync
 ```
 
-**Why `app.js` is still one ~1000-line file, deliberately.** Everything in
+**Why `app.js` is still one ~1260-line file, deliberately.** Everything in
 it shares mutable module-level state (`me`, `night`, `members`, `stops`,
 `expenses`, `balances`, `plan`, `draft`, `currentChannel`). Splitting that
 further needs one of:
@@ -63,10 +66,12 @@ can't be opened via `file://` — needs a static server locally, and Netlify
 ## Schema (all real, migrated, tested against live data)
 
 `person` (mirrors `auth.users`, `is_permanent` flag) · `night` (host_id,
-join_code, status) · `night_member` (presence window: `joined_at`/
-`left_at`, `is_dry`, `role`) · `stop` · `expense` (kind: round/food/other,
-status: pending/confirmed/disputed) · `allocation` (weight-based, supports
-uneven shares) · `settlement`
+join_code, status, `closed_at`) · `night_member` (presence window:
+`joined_at`/`left_at`, `is_dry`, `role`) · `stop` · `expense` (kind:
+round/food/other, status: pending/confirmed/disputed, `description` —
+optional free-text, added via migration, `receipt_url` — now actually
+used, see below) · `allocation` (weight-based, supports uneven shares) ·
+`settlement` (status: open/marked_paid, `marked_paid_at`)
 
 Key RPCs: `join_night`, `create_night`, `leave_night`, `add_stop`,
 `settle_night`, `close_night`, `reopen_night`, `sync_permanence`.
@@ -74,6 +79,12 @@ Key RPCs: `join_night`, `create_night`, `leave_night`, `add_stop`,
 Derived views: `allocation_share` (per-person cent share, deterministic
 penny remainders), `night_balance` (paid/owed/net per person — **never**
 cache this, always compute from expenses).
+
+**Storage:** one bucket, `receipts` (public, 10MB file size limit),
+created via migration `add_receipts_storage_bucket`. Two policies:
+authenticated upload, public read. Objects are pathed
+`{night_id}/{random-uuid}.{ext}` — see Architectural decisions for why
+public, and the open gap on access control.
 
 ## Architectural decisions worth knowing *why*, not just *what*
 
@@ -119,6 +130,62 @@ cache this, always compute from expenses).
   states with no backing logic would misrepresent what toggling them does.
   If any of those become real states later, they need their own schema/
   `eligible()` work first, not just new UI.
+- **"Mark received" writes the real `settlement.status`/`marked_paid_at`
+  now, not just a client-side Set.** The columns already existed;
+  `refreshPlan()` just wasn't passing `id`/`status` through its mapping.
+  Fixed by carrying both through in the closed-night branch only.
+- **Pay-in-Venmo and Mark-received only render once a night is closed.**
+  While running, `plan` comes from the live `settle_night()` preview and
+  has no stable row to persist a status against — and encouraging a real
+  payment against a total that's still moving is how someone overpays a
+  stale preview. This is a deliberate product-safety choice, not a bug.
+- **Round entry is total-first, not subtotal-first.** `draft.tipMode`
+  (default `false`) gates whether `tipOf()` computes anything: off, the
+  typed digits are the whole total and `tip_cents` is stored as 0; on,
+  digits are treated as a subtotal and tip is computed from the % chip,
+  exactly like the old always-on flow. Switching modes clears the typed
+  digits so a number is never silently reinterpreted between "total" and
+  "subtotal." `base_cents`/`tip_cents` themselves are untouched — this is
+  a UI-flow change, not a schema or calculation change.
+- **`expense.description` is escaped at render time; `note`/
+  `display_name` are not.** Description is the first genuinely
+  open-ended, arbitrary-length field a person types that gets rendered
+  into `innerHTML` anywhere in the app — `note` is auto-generated
+  ("Round N") and `display_name` is short and UI-constrained. This is a
+  targeted fix for the new field, not a retrofit of the existing ones;
+  the same latent gap exists for `note`/`display_name` and would need
+  its own pass if it becomes a priority.
+- **The Crew intro card is a native `<details>/<summary>`, not a custom
+  JS toggle.** Free keyboard/screen-reader disclosure semantics. The one
+  wrinkle: `renderCrew()` rebuilds `#pane-crew`'s innerHTML on every
+  refresh, which would reset `<details>`'s own `open` state on every
+  realtime update — so `crewIntroOpen` (module state) is the real source
+  of truth, written from the element's `toggle` event and read back into
+  the template on each render.
+- **The real logo is now the app's icon**, not a placeholder. Generated
+  from the exact same inline SVG markup already used in the app (via
+  `cairosvg`, not hand-drawn separately), so the icon and the in-app mark
+  can never visually drift apart. This also resolves the "no manifest/
+  icon" gap noted in the previous pass.
+- **The `receipts` storage bucket is public, not RLS-gated by night
+  membership.** A custom storage policy parsing `night_id` out of the
+  object path is possible (Postgres storage RLS supports it), but wasn't
+  built — it adds real complexity that's hard to verify without a live
+  browser to test against, for a casual social app where "not guessable"
+  (random-UUID paths) is a reasonable bar. Flagged as an open gap, not
+  silently decided.
+- **Stop 1's name is set via a direct `stop` table update, not a
+  `create_night()` RPC change.** Checked RLS first — `stop_update` already
+  permits it for any night member, no column restriction — so this reuses
+  an existing permission path instead of touching a function multiple
+  other flows depend on. Non-fatal if it fails: the night's already
+  created either way.
+- **The round card's receipt icon has no click handler when empty.**
+  When a receipt exists, its click calls `stopPropagation()` and opens
+  the viewer. When it doesn't, the click is left to bubble up to the
+  card's own tap-to-edit — attaching a receipt only ever happens in the
+  edit sheet, so an empty icon doing nothing itself but forwarding to
+  edit is intentional, not a missed handler.
 
 ## Real bugs found and fixed (context for why code looks the way it does)
 
@@ -152,6 +219,25 @@ cache this, always compute from expenses).
 - The Crew tab's presence timeline bar (`.track`/`.span`) had no
   accessible name at all — a screen reader got nothing from it. Added
   `role="img"` + a descriptive `aria-label`.
+- The invite-code input's letter-spacing (`.3em`) made it look like a
+  visually different component from the name field right beside it —
+  brought down to `.12em` to match `.code-display` elsewhere in the app.
+- `extreme()` (the Most generous / Cheapest date receipt stat) was still
+  using `money0()` while every other figure on the receipt uses `money()`
+  — same class of bug as the earlier header fix.
+- `money()` never had a thousands separator at all (`$1234.56`, not
+  `$1,234.56`) — `money0()` already did, inconsistently. Fixed by
+  switching `money()` to `Intl`/`toLocaleString`.
+- Restoring pinch-zoom (mobile-polish pass) had a side effect nobody
+  caught until it was felt on a real phone: iOS's double-tap-to-zoom
+  gesture started misfiring on fast repeated taps of the same keypad
+  button. Fixed with `touch-action:manipulation` app-wide, which kills
+  double-tap-zoom specifically without touching pinch-zoom at all.
+- While lightening the palette, found `--dim2` on `--ink3` was already
+  sitting at 4.498:1 — a hair under WCAG AA's 4.5:1 — *before* any of
+  this pass's changes. Pre-existing, not introduced here. Left `--ink3`
+  untouched rather than push it further under while lightening
+  everything else.
 
 ## Status: visual/UX redesign passes
 
@@ -189,19 +275,113 @@ cache this, always compute from expenses).
    relabel the drink-round toggle with an explicit scope explanation, and
    give the timeline bar a real accessible name. Closing from Crew reuses
    `confirmLastCall()` — not a second close flow.
-9. Not yet specified by the person.
+9. ✅ The Tab / receipt — running/final status moved into the receipt's
+   own header ("RUNNING TAB"/"FINAL TAB"), who-pays-who rows restated as
+   "X pays Y" with real persisted Unpaid/Marked paid status, action row
+   (Share Summary / Settle Up / Details) added below the receipt, playful
+   stats isolated behind `PLAYFUL_SUMMARIES`. Fixed the "Mark received
+   doesn't persist" gap for real (see Architectural decisions).
+10. ✅ Mobile/regression polish pass — accessibility (real `<label>`s,
+    live-announced toast, tab/tabpanel ARIA, keyboard-operable round
+    cards, measured contrast fixes on the receipt), touch-target sweep
+    (`.mini-btn`/`.crew-btn`/`.crew-link`/`.flag` brought up toward the
+    44px standard), a real overflow-safety fix for long Crew names, and
+    terminology alignment ("Your tab" → "Your share", "not drinking" →
+    "off rounds" in the add-sheet to match the Crew tab). No calculation
+    code touched — verified via diff and a declaration-parity check.
+11. ✅ Real branding + info guide + Crew collapse + descriptions + tip
+    calculator rework — real logo now doubles as the app icon (favicon +
+    apple-touch-icon + manifest icons, generated from the exact in-app
+    SVG); persistent header shows the logo/wordmark instead of plain
+    text (still one semantic `<h1>`); new info button opens a quick
+    guide reusing `brandBlock()` (this is where the tagline now also
+    lives, alongside the landing screen); Crew intro card collapsed by
+    default via native `<details>`; optional round description
+    (`expense.description`, new column); round entry is total-first with
+    an opt-in tip calculator instead of always-on subtotal+%.
+12. ✅ Header polish (spec-driven refinement pass) — info button dropped
+    the bordered-circle look (44px tap target via invisible padding, not
+    a visible badge), logo mark sized down ~15%, dividers shortened/
+    centered/lower-opacity, tabular numerals on every header amount,
+    tab nav bumped to 52px targets with a wider/thicker active indicator.
+    "Active" → "Still Out" with format "X / Y" → "X of Y", tying the
+    header count to the exact wording already used per-person on Crew.
+    New optional "Stop N · M rounds" context line (real data, no
+    placeholder). Crew rollup heading confirmed as "Only pay for what
+    you were there for." Explicitly did **not** build a scroll-collapsing
+    header in this pass — flagged the architecture mismatch (header/nav
+    sit outside the only scrollable region) rather than guess; see #13.
+13. ✅ Compact scroll-reminder bar — the lighter of two collapsing-header
+    approaches discussed (moving the real header into the scroll flow
+    vs. a separate fade-in reminder bar). Built the second: `#hdrCompact`
+    is `position:sticky` inside `main`, fades in past 90px of scroll and
+    out below 60px (hysteresis, no flicker), fixed height + negative
+    margin so it reserves zero layout space while hidden. Non-interactive
+    (`pointer-events:none`, `aria-hidden`) — a convenience duplicate of
+    already-accessible header info, not a second interactive surface.
+    The real header never moves; Approach A (actually collapsing it) is
+    still on the table if this doesn't feel like enough.
+14. ✅ Mobile-feel fixes — `money()` had no thousands separator at all
+    (only `money0()` did); fixed via `Intl`/`toLocaleString`. iOS
+    double-tap-to-zoom was misfiring on fast repeated keypad taps (a
+    direct side effect of restoring pinch-zoom in the mobile-polish
+    pass) — fixed with `touch-action:manipulation` app-wide, which kills
+    double-tap-zoom without touching pinch-zoom. Lightened `--ink`/
+    `--ink2`/`--line`/body background a step (re-verified AA contrast
+    before committing to numbers; left `--ink3` untouched since it was
+    *already* at 4.498:1 for `--dim2` before this pass — the tightest
+    margin in the palette, pre-existing). Real phones now go edge-to-edge
+    (≤480px: no rounded corners/border/shadow/padding), card mockup only
+    on wider/desktop viewports; added `env(safe-area-inset-top)` since
+    edge-to-edge means the header can now actually meet a notch.
+15. ✅ Initial stop naming — `create_night()` was already auto-creating
+    Stop 1 server-side (confirmed by reading the actual function, not
+    assumed) but never naming it. Added "Where does the night begin?
+    (optional)" to Start a Night; names it via a direct `stop` table
+    update after creation (RLS already permitted it — no RPC change, no
+    migration needed for this one).
+16. ✅ Receipt photo attachment — real backend work first: no Supabase
+    Storage bucket existed at all (checked, confirmed empty), so created
+    one (`receipts`, public, 10MB cap) plus upload/read policies via
+    migration. Attach button in the add/edit sheet uploads immediately on
+    selection. Round card shows a camera icon — dim by default, white
+    (`--paper`, not a color accent) when `receipt_url` is set; tapping it
+    when attached opens the photo full-size (reuses `overlay()`); tapping
+    it when empty bubbles through to the card's existing edit action
+    rather than being a dead click.
+17. Not yet specified by the person.
 
 ## Known open gaps (real, not yet fixed)
 
-- **"Mark received" doesn't persist** — flips client-side only, forgotten
-  on refresh. Never actually wired to write `settlement.status`.
 - **Stop detection is still manual** — no automatic venue-change detection
   (the four-layer plan: time gap → coarse location → venue chips → receipt
   backfill was scoped early on, never built).
-- **`venmo_handle` and receipt OCR/`ocr_payload`** — schema columns exist,
-  zero UI or logic uses them.
+- **`venmo_handle` and `ocr_payload`** — schema columns exist, zero UI or
+  logic uses them. (`receipt_url` is no longer in this list — it's real
+  now, see redesign pass #16.)
 - **QR code scannability** — generated and structurally correct, but not
   yet confirmed against a real phone camera.
 - **`app.js` is still a monolith** — see File structure above for the
   tradeoff. Not a bug, just the next real modularization decision if it
   comes up.
+- **`note`/`display_name` are still unescaped** at render time (unlike
+  `description` and now `receipt_url`'s alt text, which are escaped/safe
+  by construction) — a pre-existing gap, not introduced or fixed in any
+  of these passes. Worth a dedicated look if it becomes a priority.
+- **No focus-trap/`aria-modal` on the bottom sheets** — deliberately not
+  added without real focus-trapping behind it; still open.
+- **The `receipts` storage bucket is public**, not gated by night
+  membership. Deliberate, documented tradeoff (see Architectural
+  decisions) — paths are namespaced by night ID + a random UUID, not
+  guessable, but this is *not* the same as the auth-gated access every
+  other table in this app has via RLS + `is_night_member()`. Worth
+  revisiting if this goes beyond a friend-group tool.
+- **Orphaned receipt uploads** — if someone attaches a photo mid-edit and
+  then cancels the sheet, the file stays in storage with nothing
+  pointing to it. Harmless (never surfaced anywhere, never billed), just
+  untidy. No cleanup job exists.
+- **The scroll-collapsing header is the lighter of two options
+  (Approach B — a separate fade-in bar)**, not the header itself
+  shrinking in place (Approach A). If the fade-in reminder doesn't feel
+  like enough, moving the real header into the scroll flow is the
+  documented next step, not a rebuild.

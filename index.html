@@ -2,7 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#120D1C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/icon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
 <title>Last Call</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,27 +22,37 @@
 <div class="phone">
   <header>
     <div class="eyebrow">
-      <span id="hdrTitle">—</span>
+      <span class="eyebrow-left">
+        <span id="hdrTitle">—</span>
+        <button class="info-btn" id="btnInfo" aria-label="How this app works" title="How this app works">i</button>
+      </span>
       <span class="live offline" id="liveTag"><span class="dot"></span>Connecting…</span>
     </div>
-    <h1>Last Call</h1>
+    <div id="hdrBrand"></div>
+    <div class="hdr-context" id="hdrContext" style="display:none"></div>
     <div class="totals">
       <div class="tot-block"><div class="tot-lbl">Night total</div><div class="tot-big" id="hdrTotal">$0.00</div></div>
-      <div class="tot-block"><div class="tot-lbl">Your tab</div><div class="tot-sub" id="hdrYou">$0.00</div></div>
-      <div class="tot-block"><div class="tot-lbl">Active</div><div class="tot-sub" id="hdrOut">0 / 0</div></div>
+      <div class="tot-block"><div class="tot-lbl">Your share</div><div class="tot-sub" id="hdrYou">$0.00</div></div>
+      <div class="tot-block"><div class="tot-lbl">Still out</div><div class="tot-sub" id="hdrOut">0 of 0</div></div>
     </div>
   </header>
 
   <nav role="tablist">
-    <button role="tab" aria-selected="true" data-tab="tonight">Tonight</button>
-    <button role="tab" aria-selected="false" data-tab="crew">Crew</button>
-    <button role="tab" aria-selected="false" data-tab="tab">The Tab</button>
+    <button role="tab" id="tab-tonight" aria-selected="true" aria-controls="pane-tonight" data-tab="tonight">Tonight</button>
+    <button role="tab" id="tab-crew" aria-selected="false" aria-controls="pane-crew" data-tab="crew">Crew</button>
+    <button role="tab" id="tab-tab" aria-selected="false" aria-controls="pane-tab" data-tab="tab">The Tab</button>
   </nav>
 
   <main>
-    <section class="pane on" id="pane-tonight"></section>
-    <section class="pane" id="pane-crew"></section>
-    <section class="pane" id="pane-tab"></section>
+    <div class="hdr-compact" id="hdrCompact" aria-hidden="true">
+      <span class="hdr-compact-mark" id="hdrCompactMark"></span>
+      <span class="hdr-compact-word">Last Call</span>
+      <span class="hdr-compact-total" id="hdrCompactTotal">$0.00</span>
+      <span class="hdr-compact-live" id="hdrCompactLive"><span class="dot"></span>Live</span>
+    </div>
+    <section class="pane on" id="pane-tonight" role="tabpanel" aria-labelledby="tab-tonight"></section>
+    <section class="pane" id="pane-crew" role="tabpanel" aria-labelledby="tab-crew"></section>
+    <section class="pane" id="pane-tab" role="tabpanel" aria-labelledby="tab-tab"></section>
   </main>
 
   <div class="fab" id="fab" style="display:none">
@@ -43,7 +61,7 @@
     <button class="fab-last" id="btnLastCallFab">Last Call</button>
   </div>
 
-  <div class="toast" id="toast"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
   <div class="scrim" id="scrim"></div>
 
   <div class="sheet" id="sheet">
@@ -55,14 +73,21 @@
     <button class="link" id="toggleKind" style="padding:0;margin-bottom:14px"></button>
     <div class="section-lbl">Paid by</div>
     <div class="who" id="payerRow"></div>
-    <div class="amount-display" id="amtDisp"></div>
-    <div class="tip-row" id="tipRow">
+    <div class="amount-display" id="amtDisp" aria-live="polite"></div>
+    <button class="link tip-toggle" id="tipToggle" style="padding:0"></button>
+    <div class="tip-row" id="tipRow" style="display:none">
       <button class="chip on" data-tip="0">No tip</button>
       <button class="chip" data-tip="18">18%</button>
       <button class="chip" data-tip="20">20%</button>
       <button class="chip" data-tip="25">25%</button>
     </div>
     <div class="pad" id="pad"></div>
+    <label class="field-label" for="expDesc" style="max-width:none;margin:0 0 6px">Note (optional)</label>
+    <input id="expDesc" class="desc-field" placeholder="e.g. Margaritas at Marlowe's" maxlength="80">
+    <input type="file" id="receiptFile" accept="image/*" capture="environment" style="display:none">
+    <button class="receipt-attach-btn" id="receiptAttachBtn" type="button">
+      <span class="ico" aria-hidden="true">📷</span><span id="receiptAttachLabel">Attach Receipt</span>
+    </button>
     <div class="section-lbl">Splitting between</div>
     <div class="who" id="splitRow"></div>
     <div class="auto-note" id="autoNote"></div>
@@ -84,7 +109,7 @@
       <h2>We moved</h2>
       <p class="hint">Name it if you know it — you can rename later. Leave it blank and it'll just be "Stop N".</p>
     </div>
-    <input id="stopName" placeholder="e.g. Marlowe's" maxlength="60"
+    <input id="stopName" aria-label="Stop name" placeholder="e.g. Marlowe's" maxlength="60"
       style="width:100%;background:var(--ink3);border:1px solid var(--line);border-radius:10px;
         padding:12px;color:var(--paper);font-family:'Archivo';font-size:16px;margin-bottom:14px">
     <button class="confirm" id="stopGo">Log the move</button>

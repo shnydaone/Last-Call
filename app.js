@@ -1,6 +1,6 @@
-import { sb, DUST_CENTS } from './config.js';
-import { $, money, money0, clock, initials, groupCode, shareInvite, colorFor } from './utils.js';
-import { brandBlock } from './brand.js';
+import { sb, DUST_CENTS, PLAYFUL_SUMMARIES } from './config.js';
+import { $, money, money0, clock, initials, groupCode, shareInvite, colorFor, escapeHtml } from './utils.js';
+import { brandBlock, headerBrand, compactMark } from './brand.js';
 import { renderInviteQR } from './qr.js';
 
 
@@ -14,7 +14,9 @@ let stops = [];
 let expenses = [];          // with allocations attached
 let balances = [];
 let plan = [];              // settle_night rows
-let settledLocal = new Set();
+let crewIntroOpen = false;  // Crew intro card starts collapsed; <details> loses
+                             // its own open state whenever we rebuild the pane's
+                             // innerHTML, so this is the real source of truth.
 
 
 const M   = id => members.find(m => m.person_id === id);
@@ -99,9 +101,9 @@ function promptJoin(code){
   $('#ovTitle').innerHTML = brandBlock();
   $('#ovBody').innerHTML = `
     <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px;width:100%">
-      <div class="field-label">Invite code</div>
+      <label class="field-label" for="joinCode">Invite code</label>
       <input id="joinCode" class="code-field" value="${code}" placeholder="e.g. LASTCALL" maxlength="12" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false">
-      <div class="field-label">Your name</div>
+      <label class="field-label" for="joinName">Your name</label>
       <input id="joinName" placeholder="e.g. Sam" maxlength="24" autocomplete="name">
       <div class="field-error" id="joinErr" style="display:none"></div>
       <button id="joinGo" style="margin-top:4px">Join Night</button>
@@ -162,7 +164,7 @@ function promptSignIn(){
   overlay('Sign in', 'Get back into an account you\'ve already linked an email to.');
   $('#ovBody').innerHTML = `
     <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px;width:100%">
-      <div class="field-label">Email</div>
+      <label class="field-label" for="signInEmail">Email</label>
       <input id="signInEmail" type="email" placeholder="you@example.com" autocomplete="email">
       <div class="field-error" id="signInErr" style="display:none"></div>
       <button id="sendSignIn" style="margin-top:4px">Send Sign-In Link</button>
@@ -201,11 +203,13 @@ function promptStart(){
   overlay('Start a Night Out', 'Give it a name — or skip and we\'ll date-stamp it.');
   $('#ovBody').innerHTML = `
     <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px;width:100%">
-      <div class="field-label">Your name</div>
+      <label class="field-label" for="hostName">Your name</label>
       <input id="hostName" placeholder="e.g. Rick" maxlength="24" autocomplete="name"
         value="${me.display_name && me.display_name !== 'Guest' ? me.display_name : ''}">
-      <div class="field-label">Night name (optional)</div>
+      <label class="field-label" for="nightTitle">Night name (optional)</label>
       <input id="nightTitle" placeholder="e.g. Dave's Birthday" maxlength="60">
+      <label class="field-label" for="startStopName">Where does the night begin? (optional)</label>
+      <input id="startStopName" placeholder="e.g. Marlowe's" maxlength="60">
       <button id="createGo" style="margin-top:4px">Create Night</button>
       <button class="secondary" id="backToJoin">Back</button>
     </div>`;
@@ -224,6 +228,18 @@ function promptStart(){
     const row = Array.isArray(data) ? data[0] : data;
     const { data: person } = await sb.from('person').select('*').eq('id', me.id).single();
     if(person) me = person;
+
+    // create_night() already auto-creates Stop 1 (unnamed) server-side —
+    // this just names it, same table/RLS path "We moved" already uses to
+    // create later stops. Not fatal if it fails: the night's already
+    // created either way, this is a nice-to-have, not a blocker.
+    const stopName = $('#startStopName').value.trim();
+    if(stopName){
+      const { error: stopErr } = await sb.from('stop')
+        .update({ name: stopName }).eq('night_id', row.night_id).eq('seq', 1);
+      if(stopErr) console.error('Could not name the first stop:', stopErr);
+    }
+
     showNightCreated(row.night_id, row.join_code);
   };
   $('#backToJoin').onclick = () => promptJoin(new URLSearchParams(location.search).get('code') || '');
@@ -296,8 +312,8 @@ async function refreshPlan(){
     const { data, error } = await sb.from('settlement').select('*').eq('night_id', night.id);
     if(error){ console.error(error); plan = []; return; }
     plan = (data || []).map(s => ({
-      from_person: s.from_person, to_person: s.to_person,
-      amount_cents: s.amount_cents, is_dust: false
+      id: s.id, from_person: s.from_person, to_person: s.to_person,
+      amount_cents: s.amount_cents, is_dust: false, status: s.status
     }));
     return;
   }
@@ -366,8 +382,31 @@ function renderHeader(){
   // rounder. The header must never disagree with the numbers below it.
   $('#hdrTotal').textContent = money(grand);
   $('#hdrYou').textContent   = money(mine?.owed_cents ?? 0);
-  $('#hdrOut').textContent   = `${activeCount} / ${members.length}`;
+  $('#hdrOut').textContent   = `${activeCount} of ${members.length}`;
   $('#fab').style.display    = isOpen() ? 'flex' : 'none';
+
+  // Compact reminder bar — same grand total, same open/closed state, no
+  // second source of truth. Text content only; visibility is driven
+  // purely by scroll position (see the listener set up once, below).
+  $('#hdrCompactTotal').textContent = money(grand);
+  const compactLive = $('#hdrCompactLive');
+  compactLive.className = 'hdr-compact-live' + (isOpen() ? '' : ' closed');
+  compactLive.innerHTML = `<span class="dot"></span>${isOpen() ? 'Live' : 'Closed'}`;
+
+  // Optional one-line orientation ("STOP 2 · 3 ROUNDS") — only shown once
+  // a stop genuinely exists, using data already fetched for the Tonight
+  // tab (no separate query). Never a placeholder: hidden entirely if
+  // there's nothing to say yet.
+  const hc = $('#hdrContext');
+  if(stops.length){
+    const latest = stops[stops.length - 1];
+    const roundsHere = expenses.filter(e =>
+      e.stop_id === latest.id && e.kind === 'round' && e.status !== 'disputed').length;
+    hc.textContent = `Stop ${stops.length} · ${roundsHere} round${roundsHere===1?'':'s'}`;
+    hc.style.display = 'block';
+  } else {
+    hc.style.display = 'none';
+  }
 
   const lcFab = $('#btnLastCallFab');
   if(lcFab){
@@ -415,7 +454,7 @@ function renderTonight(){
           : uneven ? `${participants} participants · uneven split`
           : `${participants} participants`;
         const stopLabel = s.name ?? 'Stop ' + (i+1);
-        return `<div class="exp ${e.status}" ${isOpen() ? `data-edit="${e.id}"` : ''}>
+        return `<div class="exp ${e.status}" ${isOpen() ? `data-edit="${e.id}" role="button" tabindex="0"` : ''}>
           ${avatar(e.payer_id)}
           <div class="exp-mid">
             <div class="exp-head">
@@ -423,9 +462,17 @@ function renderTonight(){
               ${e.status==='disputed' ? '<span class="exp-flagtag">Flagged</span>' : ''}
             </div>
             <div class="exp-meta">${nameOf(e.payer_id)} paid · ${participantPhrase}</div>
+            ${e.description ? `<div class="exp-desc">${escapeHtml(e.description)}</div>` : ''}
             <div class="exp-sub">${clock(e.occurred_at)} · ${stopLabel}${e.tip_cents ? ` · ${money(e.tip_cents)} tip` : ''}</div>
           </div>
-          <div class="exp-amt-col"><div class="exp-amt">${money(totalOf(e))}</div></div>
+          <div class="exp-amt-col">
+            <div class="exp-amt">${money(totalOf(e))}</div>
+            <button class="receipt-btn ${e.receipt_url?'on':''}" data-receipt="${e.receipt_url?e.id:''}"
+              aria-label="${e.receipt_url ? 'View attached receipt photo' : 'No receipt attached'}"
+              title="${e.receipt_url ? 'View receipt' : 'No receipt attached'}">
+              <span aria-hidden="true">📷</span>
+            </button>
+          </div>
           <button class="flag ${e.status==='disputed'?'on':''}" data-flag="${e.id}"
             aria-label="${e.status==='disputed' ? 'Remove dispute flag — include this back in the tab' : 'Flag as disputed — hold this out of the tab'}"
             title="${e.status==='disputed' ? 'Unflag' : 'Flag as disputed'}">
@@ -453,7 +500,30 @@ function renderTonight(){
     if(error) return toast(error.message, true);
     toast(next === 'disputed' ? 'Flagged — held out of the tab' : 'Unflagged');
   });
-  $('#pane-tonight').querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openEdit(b.dataset.edit));
+  // Only wired when a receipt actually exists (data-receipt is empty
+  // otherwise) — with nothing attached, the tap just bubbles up to the
+  // card's own edit handler, which is exactly where attaching happens.
+  $('#pane-tonight').querySelectorAll('[data-receipt]:not([data-receipt=""])').forEach(b => b.onclick = ev => {
+    ev.stopPropagation();
+    const e = expenses.find(x => x.id === b.dataset.receipt);
+    if(e?.receipt_url) viewReceipt(e.receipt_url);
+  });
+  $('#pane-tonight').querySelectorAll('[data-edit]').forEach(b => {
+    b.onclick = () => openEdit(b.dataset.edit);
+    b.onkeydown = ev => {
+      if(ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); openEdit(b.dataset.edit); }
+    };
+  });
+}
+
+// Full-size receipt view — reuses the existing overlay() mechanism (same
+// one used for Connecting/Join/the info guide), no new modal machinery.
+function viewReceipt(url){
+  overlay('Receipt', '');
+  $('#ovBody').innerHTML = `
+    <img src="${url}" alt="Receipt photo" class="receipt-view-img">
+    <button id="receiptViewClose" style="margin-top:14px">Close</button>`;
+  $('#receiptViewClose').onclick = hideOverlay;
 }
 
 function renderCrew(){
@@ -464,22 +534,27 @@ function renderCrew(){
   const canLeave = !isHost() || !isOpen();
 
   $('#pane-crew').innerHTML =
-    `<div class="note-box">
-      <div class="crew-intro-head">Presence drives the split</div>
-      <p style="margin:0">People only split expenses logged while they're out.<br>Tap someone out when they leave.</p>
-      ${isHost() ? `<div class="crew-code-row">
-          <span class="crew-code-label">Join code:</span>
-          <span class="code-chip">${night.join_code}</span>
-          <button class="crew-btn primary" id="btnShareInvite">Share Invite</button>
-          <button class="crew-btn ghost" id="btnCopyCode">Copy Code</button>
-        </div>` : ''}
-      <div class="crew-host-actions">
-        <button class="crew-link" id="btnSwitchNight">Not this night? Switch</button>
-        ${canLeave
-          ? `<button class="crew-link danger" id="btnLeaveNight">Leave this night entirely</button>`
-          : `<button class="crew-link danger" id="btnCloseNight">Close the night</button>`}
+    `<details class="crew-intro" id="crewIntro" ${crewIntroOpen ? 'open' : ''}>
+      <summary class="crew-intro-summary">
+        <span class="crew-intro-head">Only pay for what you were there for</span>
+        <span class="crew-intro-hint">Join code, share &amp; exit</span>
+      </summary>
+      <div class="crew-intro-body">
+        <p style="margin:0">People only split expenses logged while they're out.<br>Tap someone out when they leave.</p>
+        ${isHost() ? `<div class="crew-code-row">
+            <span class="crew-code-label">Join code:</span>
+            <span class="code-chip">${night.join_code}</span>
+            <button class="crew-btn primary" id="btnShareInvite">Share Invite</button>
+            <button class="crew-btn ghost" id="btnCopyCode">Copy Code</button>
+          </div>` : ''}
+        <div class="crew-host-actions">
+          <button class="crew-link" id="btnSwitchNight">Not this night? Switch</button>
+          ${canLeave
+            ? `<button class="crew-link danger" id="btnLeaveNight">Leave this night entirely</button>`
+            : `<button class="crew-link danger" id="btnCloseNight">Close the night</button>`}
+        </div>
       </div>
-    </div>` +
+    </details>` +
     `<div class="section-lbl">Who was out</div>` +
     members.map(m => {
       const b = balances.find(x => x.person_id === m.person_id) ?? {paid_cents:0,owed_cents:0,net_cents:0};
@@ -574,6 +649,9 @@ function renderCrew(){
   // Same Last Call confirmation sheet as the fab — not a second close flow.
   const cn = $('#btnCloseNight');
   if(cn) cn.onclick = () => { if(isHost()) confirmLastCall(); };
+
+  const ci = $('#crewIntro');
+  ci.ontoggle = () => { crewIntroOpen = ci.open; };
 }
 
 function confirmSwitchNight(){
@@ -622,67 +700,149 @@ function renderTab(){
   const naive = expenses.filter(e=>e.status!=='disputed')
     .reduce((n,e)=> n + e.allocation.filter(a=>a.person_id!==e.payer_id).length, 0);
 
+  const final = !isOpen();
+  const stopsLine = stops.map(s=>s.name).filter(Boolean).join(' → ');
+  // Real per-payment status only exists once closed — while running, plan
+  // rows come straight from the live settle_night() preview and have no
+  // stable id to act on yet. Same reasoning for gating Pay-in-Venmo below:
+  // encouraging real money against a total that's still moving is how
+  // someone overpays a stale preview.
+  const showSettle = final && collect.some(p => p.status !== 'marked_paid');
+
   $('#pane-tab').innerHTML =
-    (isOpen() ? `<div class="preview-tag">PREVIEW · NIGHT STILL OPEN<br>
-      These numbers move as people log rounds.</div>` : '') +
     `<div class="receipt">
       <div class="r-center">
         <div class="r-title">LAST CALL</div>
-        <div class="r-muted">${isOpen()?'RUNNING TAB':'TAB CLOSED'} · ${night.title}</div>
-        <div class="r-muted">${stops.map(s=>s.name).filter(Boolean).join(' → ')}</div>
+        ${final
+          ? `<div class="r-status final">FINAL TAB</div>
+             <div class="r-status-sub">Night closed${night.closed_at ? ' at ' + clock(night.closed_at) : ''}</div>`
+          : `<div class="r-status running">RUNNING TAB</div>
+             <div class="r-status-sub">Night still open</div>`}
+        <div class="r-muted" style="margin-top:6px">${night.title}</div>
+        ${stopsLine ? `<div class="r-muted r-name" style="max-width:100%;margin:0 auto">${stopsLine}</div>` : ''}
       </div>
+      ${!final ? `<div class="r-preview-note">These numbers update as people log rounds and leave the night.</div>` : ''}
       <div class="r-rule"></div>
       <div class="r-line"><span>Subtotal</span><span>${money(grand-tips)}</span></div>
       <div class="r-line"><span>Tips</span><span>${money(tips)}</span></div>
       <div class="r-line"><b>NIGHT TOTAL</b><b>${money(grand)}</b></div>
       <div class="r-rule"></div>
-      <div class="r-center r-big">WHO PAYS WHO</div>
+      <div class="r-center r-big" id="whoPaysWhoHeading">WHO PAYS WHO</div>
       <div class="r-center r-muted" style="margin-bottom:8px">${naive} debts → ${collect.length} payment${collect.length===1?'':'s'}</div>
       ${collect.length ? collect.map((p,i) => {
-        const done = settledLocal.has(i);
+        const marked = p.status === 'marked_paid';
+        const canAct = final && p.id;
+        const iAmOwer = p.from_person === me.id;
         const handle = M(p.to_person)?.person?.venmo_handle;
-        return `<div class="r-pay ${done?'settled':''}" style="animation-delay:${i*.08}s">
-          <span><b>${nameOf(p.from_person)}</b> → ${nameOf(p.to_person)}</span><b>${money(p.amount_cents)}</b></div>
-        ${done ? '' : (p.from_person === me.id
-          ? `<a class="venmo" target="_blank" rel="noopener"
-               href="https://venmo.com/?txn=pay${handle?'&audience=private&recipients='+encodeURIComponent(handle):''}&amount=${(p.amount_cents/100).toFixed(2)}&note=${encodeURIComponent(night.title)}">Pay in Venmo</a>`
-          : `<button class="venmo" data-pay="${i}">Mark received</button>`)}`;
-      }).join('') : `<div class="r-center r-muted" style="padding:14px 0">All square.</div>`}
+        return `<div class="r-pay ${marked?'settled':''}" style="animation-delay:${i*.08}s">
+          <div class="r-pay-top">
+            <span class="r-pay-line"><b>${nameOf(p.from_person)}</b> pays <b>${nameOf(p.to_person)}</b></span>
+            <span class="r-pay-amt">${money(p.amount_cents)}</span>
+          </div>
+          <div class="r-pay-status">${marked ? 'Marked paid' : 'Unpaid'}</div>
+          ${(canAct && !marked) ? (iAmOwer
+            ? `<a class="venmo" target="_blank" rel="noopener"
+                 href="https://venmo.com/?txn=pay${handle?'&audience=private&recipients='+encodeURIComponent(handle):''}&amount=${(p.amount_cents/100).toFixed(2)}&note=${encodeURIComponent(night.title)}">Pay in Venmo</a>`
+            : `<button class="venmo" data-pay="${p.id}">Mark received</button>`) : ''}
+        </div>`;
+      }).join('') : `<div class="r-center" style="padding:10px 0">
+          <div class="r-big">ALL SQUARE</div><div class="r-muted">No payments needed.</div></div>`}
       ${dustTot ? `<div class="r-dust">Written off under $${(DUST_CENTS/100).toFixed(2)}: ${money(dustTot)}
         (${dust.map(p=>nameOf(p.from_person)).join(', ')})</div>` : ''}
       ${flagged.length ? `<div class="r-rule"></div>
-        <div class="r-muted r-center">⚑ ${flagged.length} flagged &amp; excluded</div>
-        ${flagged.map(e=>`<div class="r-line r-muted"><span>${e.note}</span><span>${money(totalOf(e))}</span></div>`).join('')}`:''}
-      <div class="r-rule"></div>
-      <div class="r-stat"><span>Rounds bought</span><span>${expenses.filter(e=>e.kind==='round').length}</span></div>
-      <div class="r-stat"><span>Most generous</span><span>${extreme(1)}</span></div>
-      <div class="r-stat"><span>Cheapest date</span><span>${extreme(-1)}</span></div>
+        <div class="r-muted r-center"><span aria-hidden="true">⚑</span> ${flagged.length} flagged &amp; excluded</div>
+        ${flagged.map(e=>`<div class="r-line r-muted"><span class="r-name">${e.note}</span><span>${money(totalOf(e))}</span></div>`).join('')}`:''}
+      ${playfulStatsHtml()}
       <div class="r-rule"></div>
       <div class="r-center r-muted">*** THAT'S LAST CALL, FOLKS ***</div>
     </div>` +
-    (!isOpen() && isHost()
+    `<div class="tab-actions">
+      <button class="tab-action-btn" id="btnShareSummary">Share Summary</button>
+      ${showSettle ? `<button class="tab-action-btn primary" id="btnSettleUp">Settle Up</button>` : ''}
+      <button class="tab-action-btn" id="btnToggleDetails">Details</button>
+    </div>` +
+    `<div class="tab-details" id="tabDetails">
+      ${balances.map(b => `<div class="tab-details-row">
+          <span class="nm">${nameOf(b.person_id)}</span>
+          <span class="tab-details-nums"><span>Paid ${money(b.paid_cents)}</span><span>Share ${money(b.owed_cents)}</span></span>
+        </div>`).join('') || `<div class="tab-details-row"><span class="nm">No one on the tab yet.</span></div>`}
+    </div>` +
+    (final && isHost()
       ? `<button class="lastcall" id="btnReopen" style="margin-top:14px;background:linear-gradient(135deg,var(--teal),#1d9e7a)">
            Reopen this night<small>ADD MORE · RE-SETTLE LATER</small></button>`
       : '');
 
-  $('#pane-tab').querySelectorAll('[data-pay]').forEach(b => b.onclick = () => {
-    settledLocal.add(+b.dataset.pay);
+  $('#pane-tab').querySelectorAll('[data-pay]').forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    const { error } = await sb.from('settlement')
+      .update({ status: 'marked_paid', marked_paid_at: new Date().toISOString() })
+      .eq('id', b.dataset.pay);
+    if(error){ b.disabled = false; return toast(error.message, true); }
+    await refreshPlan();
     toast('Marked received — we never move the money');
     renderTab();
   });
+
+  $('#btnShareSummary').onclick = () => shareTabSummary(grand, collect, final);
+
+  const su = $('#btnSettleUp');
+  if(su) su.onclick = () => {
+    const mine = collect.find(p => p.from_person === me.id && p.status !== 'marked_paid');
+    if(mine){
+      const handle = M(mine.to_person)?.person?.venmo_handle;
+      const url = `https://venmo.com/?txn=pay${handle?'&audience=private&recipients='+encodeURIComponent(handle):''}&amount=${(mine.amount_cents/100).toFixed(2)}&note=${encodeURIComponent(night.title)}`;
+      window.open(url, '_blank', 'noopener');
+    } else {
+      $('#whoPaysWhoHeading')?.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' });
+    }
+  };
+
+  $('#btnToggleDetails').onclick = () => $('#tabDetails').classList.toggle('on');
 
   const rp = $('#btnReopen');
   if(rp) rp.onclick = async () => {
     const { error } = await sb.rpc('reopen_night', { p_night_id: night.id });
     if(error) return toast(error.message, true);
-    settledLocal.clear();
     toast('Reopened — back to logging rounds');
     goTab('tonight');
   };
 }
+
+// Gates the receipt's personality stats only — see PLAYFUL_SUMMARIES in
+// config.js. The closing tagline below is signature chrome, not gated.
+function playfulStatsHtml(){
+  if(!PLAYFUL_SUMMARIES) return '';
+  return `<div class="r-rule"></div>
+    <div class="r-stat"><span>Rounds bought</span><span>${expenses.filter(e=>e.kind==='round').length}</span></div>
+    <div class="r-stat"><span>Most generous</span><span>${extreme(1)}</span></div>
+    <div class="r-stat"><span>Cheapest date</span><span>${extreme(-1)}</span></div>`;
+}
 function extreme(dir){
   const s = [...balances].sort((a,b)=> dir*(b.paid_cents - a.paid_cents))[0];
-  return s ? `${nameOf(s.person_id)} (${money0(s.paid_cents)})` : '—';
+  // money(), not money0() — every other figure on this receipt is cents-
+  // precise; this was the one place still rounding to whole dollars.
+  return s ? `${nameOf(s.person_id)} (${money(s.paid_cents)})` : '—';
+}
+const prefersReducedMotion = () =>
+  window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Deliberately minimal — names and net payment amounts only, the same
+// figures already visible to the whole group in the receipt. No Venmo
+// handles, no per-person paid/share breakdown, no join code.
+async function shareTabSummary(grand, collect, final){
+  const lines = [`${night.title} — ${final ? 'final tab' : 'running tab'}: ${money(grand)}`];
+  if(collect.length){
+    collect.forEach(p => lines.push(`${nameOf(p.from_person)} pays ${nameOf(p.to_person)}: ${money(p.amount_cents)}`));
+  } else {
+    lines.push('All square — no payments needed.');
+  }
+  const text = lines.join('\n');
+  if(navigator.share){
+    try{ await navigator.share({ title: 'Last Call', text }); return; }
+    catch(e){ if(e.name === 'AbortError') return; }
+  }
+  try{ await navigator.clipboard.writeText(text); toast('Summary copied'); }
+  catch{ toast('Could not share — try again', true); }
 }
 
 function renderAll(){ if(!night) return; renderHeader(); renderTonight(); renderCrew(); renderTab(); }
@@ -738,9 +898,9 @@ async function doLastCall(){
 let draft = null;
 const baseOf = () => draft.editing ? draft.base : parseInt(draft.digits || '0', 10);
 const tipOf  = () => {
-  const b = baseOf();
   if(draft.editing) return draft.fixedTip;
-  return Math.round(b * draft.tip / 100);
+  if(!draft.tipMode) return 0;
+  return Math.round(baseOf() * draft.tip / 100);
 };
 const wSum = () => draft.alloc.reduce((s,a)=>s+a.w, 0);
 
@@ -751,7 +911,7 @@ function eligible(kind, at){
 function applyKindLabels(){
   $('#shTitle').textContent = draft.kind === 'round' ? "Who's buying?" : 'Log an expense';
   $('#shHint').textContent  = draft.kind === 'round'
-    ? 'Split defaults to whoever is out right now, minus anyone not drinking.'
+    ? 'Split defaults to whoever is out right now, minus anyone off rounds.'
     : "Cover, cab, coat check, cash tip — anything that isn't a round.";
   $('#toggleKind').textContent = draft.kind === 'round'
     ? 'Not a round? Log something else instead'
@@ -760,7 +920,8 @@ function applyKindLabels(){
 
 function openAdd(kind){
   const at = new Date();
-  draft = { editing:null, kind, payer: me.id, digits:'', tip: 0,
+  draft = { editing:null, kind, payer: me.id, digits:'', tip: 0, tipMode:false, description:'',
+            receiptUrl: null,
             showShares:false, at, alloc: eligible(kind, at).map(p => ({p, w:1})) };
   applyKindLabels();
   $('#toggleKind').style.display = 'block';
@@ -772,10 +933,11 @@ function openEdit(id){
   if(!isOpen()) return toast('Tab is closed', true);
   const e = expenses.find(x => x.id === id);
   draft = { editing:id, kind:e.kind, payer:e.payer_id, base:e.base_cents, fixedTip:e.tip_cents,
+            description: e.description || '', receiptUrl: e.receipt_url || null,
             showShares: e.allocation.some(a => Number(a.weight) !== 1), at: new Date(e.occurred_at),
             alloc: e.allocation.map(a => ({ p:a.person_id, w:Number(a.weight) })) };
   $('#shTitle').textContent = 'Edit expense';
-  $('#shHint').textContent = `${e.note ?? 'Expense'} · logged ${clock(e.occurred_at)}. Drop someone out or give them a bigger share.`;
+  $('#shHint').textContent = `${e.note ?? 'Expense'}${e.description ? ' — ' + e.description : ''} · logged ${clock(e.occurred_at)}. Drop someone out or give them a bigger share.`;
   $('#toggleKind').style.display = 'none';
   $('#pad').style.display = 'none';
   $('#voidBtn').style.display = 'block';
@@ -836,16 +998,37 @@ function renderSheet(){
   $('#payerRow').querySelectorAll('[data-payer]').forEach(b => b.onclick = () => { draft.payer = b.dataset.payer; renderSheet(); });
 
   const tot = baseOf() + tipOf(), W = wSum() || 1;
+  const sub = draft.tipMode
+    ? `${money(baseOf())} + ${money(tipOf())} tip${draft.alloc.length?` · ${money(Math.round(tot/W))}/share`:''}`
+    : (draft.alloc.length ? `${money(Math.round(tot/W))}/share` : 'total');
   $('#amtDisp').innerHTML = tot
-    ? `${money(tot)}<span style="font-size:12px;color:var(--dim2);display:block;margin-top:2px">
-        ${money(baseOf())} + ${money(tipOf())} tip${draft.alloc.length?` · ${money(Math.round(tot/W))}/share`:''}</span>`
+    ? `${money(tot)}<span style="font-size:12px;color:var(--dim2);display:block;margin-top:2px">${sub}</span>`
     : `$0.00<span style="font-size:12px;color:var(--dim2);display:block;margin-top:2px">tap the keypad</span>`;
 
-  $('#tipRow').style.display = draft.editing ? 'none' : 'flex';
+  // Total-first by default — most people just know what they paid.
+  // The tip calculator is opt-in for anyone who'd rather work from a
+  // subtotal + tip%; switching modes clears the digits so a typed
+  // total is never silently reinterpreted as a subtotal (or vice versa).
+  $('#tipToggle').style.display = draft.editing ? 'none' : 'block';
+  $('#tipToggle').textContent = draft.tipMode ? 'Enter total directly' : '+ Calculate a tip';
+  $('#tipToggle').onclick = () => {
+    draft.tipMode = !draft.tipMode;
+    draft.digits = '';
+    draft.tip = 0;
+    renderSheet();
+  };
+  $('#tipRow').style.display = (!draft.editing && draft.tipMode) ? 'flex' : 'none';
   $('#tipRow').querySelectorAll('.chip').forEach(c => {
     c.classList.toggle('on', String(draft.tip) === c.dataset.tip);
     c.onclick = () => { draft.tip = +c.dataset.tip; renderSheet(); };
   });
+
+  $('#expDesc').value = draft.description || '';
+  $('#expDesc').oninput = e => { draft.description = e.target.value; };
+
+  const rBtn = $('#receiptAttachBtn'), rLbl = $('#receiptAttachLabel');
+  rBtn.classList.toggle('on', !!draft.receiptUrl);
+  rLbl.textContent = draft.receiptUrl ? 'Receipt attached · Tap to replace' : 'Attach Receipt';
 
   const inSplit = id => draft.alloc.some(a => a.p === id);
   $('#splitRow').innerHTML = members.map(m => `
@@ -861,7 +1044,7 @@ function renderSheet(){
   const dry  = members.filter(m => m.is_dry && presentAt(m, at));
   const bits = [];
   if(away.length) bits.push(`${away.map(m=>m.person.display_name).join(', ')} not here — excluded automatically.`);
-  if(dry.length && draft.kind === 'round') bits.push(`${dry.map(m=>m.person.display_name).join(', ')} not drinking — off this round.`);
+  if(dry.length && draft.kind === 'round') bits.push(`${dry.map(m=>m.person.display_name).join(', ')} off rounds — skipped automatically.`);
   $('#autoNote').textContent = bits.join(' ');
 
   $('#tglShares').textContent = draft.showShares ? 'Even split' : 'Uneven shares';
@@ -890,7 +1073,10 @@ function renderSheet(){
 }
 
 $('#pad').innerHTML = ['1','2','3','4','5','6','7','8','9','·','0','⌫']
-  .map(k => `<button data-k="${k}">${k}</button>`).join('');
+  .map(k => {
+    const label = k === '·' ? 'double zero' : k === '⌫' ? 'backspace' : k;
+    return `<button data-k="${k}" aria-label="${label}">${k}</button>`;
+  }).join('');
 $('#pad').querySelectorAll('button').forEach(b => b.onclick = () => {
   const k = b.dataset.k;
   if(k === '⌫') draft.digits = draft.digits.slice(0,-1);
@@ -903,6 +1089,35 @@ $('#selPresent').onclick = () => { draft.alloc = eligible(draft.kind, draft.at).
 $('#selAll').onclick     = () => { draft.alloc = members.map(m=>({p:m.person_id,w:1})); renderSheet(); };
 $('#selNone').onclick    = () => { draft.alloc = []; renderSheet(); };
 $('#tglShares').onclick  = () => { if(draft.showShares) draft.alloc.forEach(a=>a.w=1); draft.showShares=!draft.showShares; renderSheet(); };
+$('#receiptAttachBtn').onclick = () => $('#receiptFile').click();
+$('#receiptFile').onchange = async e => {
+  const file = e.target.files[0];
+  e.target.value = ''; // allow re-selecting the same file later (e.g. after removing)
+  if(!file) return;
+  if(file.size > 10 * 1024 * 1024) return toast('That photo is too large (10MB max)', true);
+
+  const rBtn = $('#receiptAttachBtn'), rLbl = $('#receiptAttachLabel');
+  rBtn.disabled = true;
+  rLbl.textContent = 'Uploading…';
+
+  // Path is namespaced by night, not by expense — for a brand-new
+  // expense we don't have an expense id yet at upload time. A random
+  // filename is enough; the bucket is public (see KNOWLEDGE.md), so the
+  // path itself isn't relied on for access control.
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().slice(0, 5);
+  const path = `${night.id}/${crypto.randomUUID()}.${ext}`;
+  const { error: upErr } = await sb.storage.from('receipts').upload(path, file);
+  if(upErr){
+    rBtn.disabled = false;
+    renderSheet();
+    return toast(upErr.message, true);
+  }
+  const { data: pub } = sb.storage.from('receipts').getPublicUrl(path);
+  draft.receiptUrl = pub.publicUrl;
+  rBtn.disabled = false;
+  renderSheet();
+  toast('Receipt attached');
+};
 $('#btnRound').onclick   = () => openAdd('round');
 $('#btnLastCallFab').onclick = () => { if(isHost()) confirmLastCall(); };
 $('#btnStop').onclick    = () => openNewStop();
@@ -934,7 +1149,10 @@ $('#confirmBtn').onclick = async () => {
   $('#confirmBtn').disabled = true;
 
   if(draft.editing){
-    const { error: e1 } = await sb.from('expense').update({ payer_id: draft.payer }).eq('id', draft.editing);
+    const { error: e1 } = await sb.from('expense')
+      .update({ payer_id: draft.payer, description: draft.description?.trim() || null,
+                 receipt_url: draft.receiptUrl || null })
+      .eq('id', draft.editing);
     if(e1){ close(); return toast(e1.message, true); }
     await sb.from('allocation').delete().eq('expense_id', draft.editing);
     const { error: e2 } = await sb.from('allocation').insert(
@@ -949,6 +1167,8 @@ $('#confirmBtn').onclick = async () => {
     night_id: night.id, stop_id: stop?.id ?? null, payer_id: draft.payer,
     base_cents: baseOf(), tip_cents: tipOf(), kind: draft.kind,
     note: draft.kind === 'round' ? `Round ${n}` : 'Expense',
+    description: draft.description?.trim() || null,
+    receipt_url: draft.receiptUrl || null,
     created_by: me.id
   }).select().single();
 
@@ -987,6 +1207,7 @@ function toast(msg, isErr = false, action = null){
     t.textContent = msg;
   }
   t.className = 'toast on' + (isErr ? ' err' : '') + (action ? ' actionable' : '');
+  t.setAttribute('aria-live', isErr ? 'assertive' : 'polite');
   clearTimeout(tT);
   tT = setTimeout(() => t.className = 'toast', action ? 4200 : 3200);
 }
@@ -997,5 +1218,44 @@ function overlay(title, sub){
   $('#overlay').classList.add('on');
 }
 function hideOverlay(){ $('#overlay').classList.remove('on'); }
+
+// Quick guide — reuses the same overlay used for Connecting/Join/etc.
+// Just shows/hides on top of whatever's already rendered underneath;
+// doesn't touch night/members/expenses state, so it's safe to open
+// mid-session and dismiss back into exactly where you were.
+function showGuide(){
+  overlay('', 'A quick guide to how this works.');
+  $('#ovTitle').innerHTML = brandBlock();
+  $('#ovBody').innerHTML = `
+    <div class="guide-list">
+      <div class="guide-item"><b>Presence drives the split.</b> Tap someone out when they leave — new rounds skip them automatically.</div>
+      <div class="guide-item"><b>Add Round</b> when someone buys. The split defaults to whoever's here.</div>
+      <div class="guide-item"><b>Add Stop</b> when the group moves to a new place.</div>
+      <div class="guide-item"><b>Last Call</b> closes the night and works out who pays who.</div>
+      <div class="guide-item">Everything updates live for the whole group.</div>
+    </div>
+    <button id="guideClose" style="margin-top:6px">Got it</button>`;
+  $('#guideClose').onclick = hideOverlay;
+}
+$('#btnInfo').onclick = showGuide;
+
+$('#hdrBrand').innerHTML = headerBrand();
+$('#hdrCompactMark').innerHTML = compactMark();
+
+// Compact bar visibility — sticky positioning is free (CSS handles it);
+// this only ever toggles a class. Hysteresis (show >90px, hide <60px)
+// so it doesn't flicker in/out right at one fixed line. Also self-resets
+// correctly on tab switches, since switching tabs already does
+// main.scrollTop = 0, which fires this same 'scroll' event.
+{
+  const mainEl = $('main');
+  const compactBar = $('#hdrCompact');
+  let compactShown = false;
+  mainEl.addEventListener('scroll', () => {
+    const y = mainEl.scrollTop;
+    if(!compactShown && y > 90){ compactShown = true; compactBar.classList.add('show'); }
+    else if(compactShown && y < 60){ compactShown = false; compactBar.classList.remove('show'); }
+  }, { passive: true });
+}
 
 boot().catch(e => overlay('Something broke', e.message));

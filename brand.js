@@ -1,16 +1,19 @@
 /* ============================================================
-   BRAND — logo mark + wordmark + tagline. Used only on the
-   join/start landing overlay (see app.js promptJoin()) — the one
-   "hero" moment; deliberately not repeated on every sub-screen.
+   BRAND — logo mark, wordmark, tagline.
+   - brandBlock(): logo + wordmark + tagline. Used on the join/start
+     landing overlay (the one "hero" moment) and the info guide.
+   - headerBrand(): logo + wordmark only, sized down, wrapped in the
+     page's one <h1> — used in the persistent app header.
    ============================================================ */
 
 // Logo mark — circular arrows (the "session recirculates" motif) around an
 // L/C monogram. Inline SVG rather than an asset file, so it inherits the
-// palette without an extra request and never asks for image handoff.
+// palette without an extra request. Same markup everywhere it appears;
+// only the wrapper class changes so CSS can size it per context.
 // Hex values hardcoded rather than var(--...) — presentation attributes on
 // <stop>/<text> don't reliably resolve custom properties across browsers
 // when the SVG is injected as an innerHTML string.
-const LC_MARK = `<svg viewBox="0 0 100 100" class="lc-mark" aria-hidden="true">
+const lcMark = (cls) => `<svg viewBox="0 0 100 100" class="${cls}" aria-hidden="true">
   <defs>
     <linearGradient id="lcGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#E8A33D"/>
@@ -29,9 +32,23 @@ const LC_MARK = `<svg viewBox="0 0 100 100" class="lc-mark" aria-hidden="true">
 
 export const brandBlock = () => `
   <div class="brand">
-    ${LC_MARK}
+    ${lcMark('lc-mark')}
     <div>
       <div class="brand-word">Last Call</div>
       <div class="brand-tag">One night out&nbsp; · &nbsp;Zero confusion.</div>
     </div>
+  </div>`;
+
+// Bare mark only, for the compact scroll-reminder bar — sizing is handled
+// entirely by that bar's own CSS container, not a dedicated class here.
+export const compactMark = () => lcMark('');
+
+// Compact version for the persistent app header — logo + wordmark, no
+// tagline (repeating the tagline on every screen would dilute it; it
+// stays on the landing overlay and the info guide). Keeps the page's
+// single <h1> for document structure instead of a plain <div>.
+export const headerBrand = () => `
+  <div class="hdr-brand">
+    ${lcMark('lc-mark-sm')}
+    <h1 class="hdr-brand-word">Last Call</h1>
   </div>`;
