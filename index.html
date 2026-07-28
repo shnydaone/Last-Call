@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Last Call</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+
+</head>
+<body>
+<div class="phone">
+  <header>
+    <div class="eyebrow">
+      <span id="hdrTitle">—</span>
+      <span class="live offline" id="liveTag"><span class="dot"></span>Connecting…</span>
+    </div>
+    <h1>Last Call</h1>
+    <div class="totals">
+      <div class="tot-block"><div class="tot-lbl">Night total</div><div class="tot-big" id="hdrTotal">$0.00</div></div>
+      <div class="tot-block"><div class="tot-lbl">Your tab</div><div class="tot-sub" id="hdrYou">$0.00</div></div>
+      <div class="tot-block"><div class="tot-lbl">Active</div><div class="tot-sub" id="hdrOut">0 / 0</div></div>
+    </div>
+  </header>
+
+  <nav role="tablist">
+    <button role="tab" aria-selected="true" data-tab="tonight">Tonight</button>
+    <button role="tab" aria-selected="false" data-tab="crew">Crew</button>
+    <button role="tab" aria-selected="false" data-tab="tab">The Tab</button>
+  </nav>
+
+  <main>
+    <section class="pane on" id="pane-tonight"></section>
+    <section class="pane" id="pane-crew"></section>
+    <section class="pane" id="pane-tab"></section>
+  </main>
+
+  <div class="fab" id="fab" style="display:none">
+    <button class="fab-main" id="btnRound">+ Add Round</button>
+    <button class="fab-alt" id="btnStop"><span class="ico" aria-hidden="true">📍</span>Add Stop</button>
+    <button class="fab-last" id="btnLastCallFab">Last Call</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <div class="scrim" id="scrim"></div>
+
+  <div class="sheet" id="sheet">
+    <div class="sheet-handle">
+      <div class="grab"></div>
+      <h2 id="shTitle"></h2>
+      <p class="hint" id="shHint"></p>
+    </div>
+    <button class="link" id="toggleKind" style="padding:0;margin-bottom:14px"></button>
+    <div class="section-lbl">Paid by</div>
+    <div class="who" id="payerRow"></div>
+    <div class="amount-display" id="amtDisp"></div>
+    <div class="tip-row" id="tipRow">
+      <button class="chip on" data-tip="0">No tip</button>
+      <button class="chip" data-tip="18">18%</button>
+      <button class="chip" data-tip="20">20%</button>
+      <button class="chip" data-tip="25">25%</button>
+    </div>
+    <div class="pad" id="pad"></div>
+    <div class="section-lbl">Splitting between</div>
+    <div class="who" id="splitRow"></div>
+    <div class="auto-note" id="autoNote"></div>
+    <div class="who-actions">
+      <button class="link" id="selPresent">Who's here</button>
+      <button class="link" id="selAll">Everyone</button>
+      <button class="link" id="selNone">Clear</button>
+      <button class="link" id="tglShares">Uneven shares</button>
+    </div>
+    <div class="shares" id="sharesPanel" style="display:none"></div>
+    <button class="confirm" id="confirmBtn"></button>
+    <button class="danger" id="voidBtn" style="display:none">Void this expense</button>
+    <button class="cancel" id="cancelBtn">Cancel</button>
+  </div>
+
+  <div class="sheet" id="stopSheet" style="padding:20px 20px 24px">
+    <div class="sheet-handle">
+      <div class="grab"></div>
+      <h2>We moved</h2>
+      <p class="hint">Name it if you know it — you can rename later. Leave it blank and it'll just be "Stop N".</p>
+    </div>
+    <input id="stopName" placeholder="e.g. Marlowe's" maxlength="60"
+      style="width:100%;background:var(--ink3);border:1px solid var(--line);border-radius:10px;
+        padding:12px;color:var(--paper);font-family:'Archivo';font-size:16px;margin-bottom:14px">
+    <button class="confirm" id="stopGo">Log the move</button>
+    <button class="cancel" id="stopCancel">Cancel</button>
+  </div>
+
+  <div class="sheet" id="lastCallSheet" style="padding:20px 20px 22px">
+    <div class="sheet-handle">
+      <div class="grab"></div>
+      <h2>Last Call?</h2>
+      <p class="hint">This closes the night and prepares the final tab.</p>
+    </div>
+    <div class="lc-summary" id="lcSummary"></div>
+    <button class="keep-btn" id="lcKeepBtn">Keep Night Open</button>
+    <button class="end-btn" id="lcEndBtn">End Night</button>
+  </div>
+
+  <div class="overlay" id="overlay">
+    <div class="big" id="ovTitle">Connecting</div>
+    <div class="sub" id="ovSub">Signing you in…</div>
+    <div id="ovBody"></div>
+  </div>
+</div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
