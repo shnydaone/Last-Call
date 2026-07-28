@@ -21,6 +21,13 @@ so none are guessed.
   expense by id, the same primitive the existing Void button already used.
 - `js/qr.js`, `js/brand.js`, `js/utils.js`, `js/config.js` — new leaf
   modules split out of the single inline script (see Changed below).
+- Copy Code button on the Crew tab — clipboard copy of the join code was
+  previously only available once, on the "Night Out Started" screen; same
+  logic, now available for the life of the night too.
+- "Close the night" action on the Crew tab (host, night open) — calls the
+  same `confirmLastCall()` the fab already used; not a second close flow.
+  Previously this state only showed inert text ("Close the night to leave
+  as host") with no button.
 
 ### Changed
 - Header now shows precise currency (`$55.45`, not `$55`) for both Night
@@ -58,6 +65,26 @@ so none are guessed.
   `QRCode.toCanvas()` call that was previously inline.
 - Started this changelog, `KNOWLEDGE.md`, and `README.md` as a standing
   "full package" alongside code changes.
+- **Crew tab rebuilt.** Intro card now leads with a real heading
+  ("Presence drives the split") and the exact two-line explanation of the
+  rule; join code moved into its own row with Share Invite + Copy Code;
+  Switch/Leave/Close moved into a visually separate block below a divider
+  (danger color on Leave/Close).
+- Each participant row now shows a plain-English presence state
+  ("Still out since 8:49 PM" / "Left at 10:42 PM") instead of a separate
+  "Gone" pill plus a raw IN/OUT timestamp row.
+- Participant money display expanded from 2 numbers (share, net) to the
+  3 genuinely distinct fields `night_balance` provides: Paid, Current
+  share, and Owes/Is owed — `paid_cents` wasn't surfaced anywhere before.
+- "Not Drinking" relabeled "Skip Rounds" / "Include in Rounds"
+  (action-oriented, matching the existing Tap Out/Tap Back In pattern),
+  with a `title` + `aria-label` explaining exactly what it does: excludes
+  from round-kind expenses only, no effect on food/other. The toggle's
+  underlying behavior (`is_dry` on `night_member`) is unchanged.
+- Presence timeline bar gained `role="img"` + a descriptive `aria-label`
+  ("Present from X to Y") — previously had no accessible name at all.
+  Arrival/departure captions relabeled "Arrived"/"Left"/"Present now"
+  (was "IN"/"OUT"/"STILL OUT").
 
 ### Notes
 - `app.js` remains a single ~950-line file by design — it owns all shared
@@ -67,6 +94,15 @@ so none are guessed.
 - Native ES module `import` syntax means `index.html` no longer works via
   `file://` — needs a static server locally (was previously
   double-click-to-open).
+- Considered a multi-option "participation menu" (full split / food only /
+  not drinking / excluded from next round / left the night) but only two
+  independent, calculation-affecting fields actually exist
+  (`night_member.left_at` and `.is_dry`). Implemented exactly those two
+  states plus their one combination; didn't add labels for states with no
+  backing logic.
+- `.tag-dry` and `.tag-gone` CSS classes are now unused (that information
+  moved into the row's plain-English state line) — left defined rather
+  than risk an unrelated deletion.
 
 ## Earlier (pre-changelog, reconstructed from the original handoff)
 

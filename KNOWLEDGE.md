@@ -25,7 +25,7 @@ js/
   app.js              state, auth/boot, rendering, sheets, realtime sync
 ```
 
-**Why `app.js` is still one ~950-line file, deliberately.** Everything in
+**Why `app.js` is still one ~1000-line file, deliberately.** Everything in
 it shares mutable module-level state (`me`, `night`, `members`, `stops`,
 `expenses`, `balances`, `plan`, `draft`, `currentChannel`). Splitting that
 further needs one of:
@@ -109,6 +109,16 @@ cache this, always compute from expenses).
   `expense.delete().eq('id', data.id)` — the exact same primitive the Void
   button in the edit sheet already used. No separate "soft delete" or
   client-only revert was invented.
+- **"Close the night" on the Crew tab calls the same `confirmLastCall()`
+  the fab uses.** No parallel close flow — one function, two entry points.
+- **Participation states are limited to what `eligible()` actually checks:
+  presence (`left_at`) and the round-only `is_dry` flag.** A richer
+  "participation menu" (food only / excluded from next round / left the
+  night) was considered and explicitly not built — those aren't
+  independently supported by the calc engine, and inventing labels for
+  states with no backing logic would misrepresent what toggling them does.
+  If any of those become real states later, they need their own schema/
+  `eligible()` work first, not just new UI.
 
 ## Real bugs found and fixed (context for why code looks the way it does)
 
@@ -134,6 +144,14 @@ cache this, always compute from expenses).
 - The header's "Out 1/1" reads as "1 of 1 people have left," backwards
   from what it means (count of members *still present*, not yet left).
   Relabeled "Active."
+- The "Not Drinking" toggle changed the same thing it always had
+  (`is_dry`, checked only for round-kind expenses in `eligible()`), but
+  the UI never said so — read as a general dietary/preference flag rather
+  than "skip drink rounds specifically." Relabeled with explicit scope
+  text rather than changing the underlying flag.
+- The Crew tab's presence timeline bar (`.track`/`.span`) had no
+  accessible name at all — a screen reader got nothing from it. Added
+  `role="img"` + a descriptive `aria-label`.
 
 ## Status: visual/UX redesign passes
 
@@ -163,7 +181,15 @@ cache this, always compute from expenses).
 7. ✅ Modularization — split the single HTML file into
    `index.html` + `styles.css` + `js/*.js` (see File structure above).
    Not originally part of this numbered plan, but done as its own pass.
-8. Not yet specified by the person.
+8. ✅ Crew tab — intro card leads with a plain-language statement of the
+   presence rule, join code + Share/Copy in their own row, Switch/Leave/
+   Close visually separated below a divider; participant rows now state
+   presence in words ("Still out since..."/"Left at..."), surface all
+   three `night_balance` fields (Paid/Current share/Owes) instead of two,
+   relabel the drink-round toggle with an explicit scope explanation, and
+   give the timeline bar a real accessible name. Closing from Crew reuses
+   `confirmLastCall()` — not a second close flow.
+9. Not yet specified by the person.
 
 ## Known open gaps (real, not yet fixed)
 

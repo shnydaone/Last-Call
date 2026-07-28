@@ -464,16 +464,21 @@ function renderCrew(){
   const canLeave = !isHost() || !isOpen();
 
   $('#pane-crew').innerHTML =
-    `<div class="note-box"><b style="color:var(--paper)">Presence drives the split.</b><br>
-      Tap someone out when they leave and every expense logged after that skips them automatically.
-      ${isHost() ? `<br><br>Join code: <span class="code-chip">${night.join_code}</span>
-        <button id="btnTextCode" style="display:inline-block;margin-left:8px;background:var(--amber);
-          color:var(--ink);border:none;border-radius:var(--r-sm);padding:8px 14px;
-          font-size:12px;font-weight:600;cursor:pointer">Share</button>` : ''}
-      <br><br><button class="link" id="btnSwitchNight" style="padding:0">Not this night? Switch</button>
-      <br>${canLeave
-        ? `<button class="link" id="btnLeaveNight" style="padding:0;color:var(--magenta)">Leave this night entirely</button>`
-        : `<span style="font-size:10px;color:var(--dim2);letter-spacing:.08em;text-transform:uppercase">Close the night to leave as host</span>`}
+    `<div class="note-box">
+      <div class="crew-intro-head">Presence drives the split</div>
+      <p style="margin:0">People only split expenses logged while they're out.<br>Tap someone out when they leave.</p>
+      ${isHost() ? `<div class="crew-code-row">
+          <span class="crew-code-label">Join code:</span>
+          <span class="code-chip">${night.join_code}</span>
+          <button class="crew-btn primary" id="btnShareInvite">Share Invite</button>
+          <button class="crew-btn ghost" id="btnCopyCode">Copy Code</button>
+        </div>` : ''}
+      <div class="crew-host-actions">
+        <button class="crew-link" id="btnSwitchNight">Not this night? Switch</button>
+        ${canLeave
+          ? `<button class="crew-link danger" id="btnLeaveNight">Leave this night entirely</button>`
+          : `<button class="crew-link danger" id="btnCloseNight">Close the night</button>`}
+      </div>
     </div>` +
     `<div class="section-lbl">Who was out</div>` +
     members.map(m => {
@@ -483,24 +488,47 @@ function renderCrew(){
       const here = presentAt(m, now);
       const isMe = m.person_id === me.id;
       const canEdit = isMe || isHost();
+
+      // Presence state in one sentence — the two things eligible() actually
+      // checks (presentAt, and is_dry for round-kind only), nothing more.
+      const stateLine = here
+        ? `Still out since ${clock(m.joined_at)}${m.is_dry ? ' <span class="qual">· off rounds</span>' : ''}`
+        : `Left at ${clock(m.left_at)}`;
+
+      const netLabel = b.net_cents >= 0 ? 'Is owed' : 'Owes';
+      const netClass = b.net_cents >= 0 ? 'pos' : 'neg';
+
+      const timelineAria = here
+        ? `Present from ${clock(m.joined_at)} to now`
+        : `Present from ${clock(m.joined_at)} to ${clock(m.left_at)}`;
+
+      // The rounds toggle only ever excludes someone from round-kind
+      // expenses (see eligible() — the is_dry check is gated on
+      // kind==='round'). It has no effect on food/other expenses, so the
+      // explanation says that explicitly rather than leaving it implied.
+      const dryExplain = 'Excludes them from drink-round expenses only — food and other expenses still include them while present.';
+
       return `<div class="prow">
         <div class="ptop">
           ${avatar(m.person_id)}
           <div class="pname">${m.person.display_name}${isMe?' (you)':''}
-            ${m.role==='host'?'<span class="ptag tag-host">Host</span>':''}
-            ${m.is_dry?'<span class="ptag tag-dry">Not drinking</span>':''}
-            ${!here?'<span class="ptag tag-gone">Gone</span>':''}</div>
-          <div style="min-width:84px">
-            <div class="pspend">${money(b.owed_cents)}</div>
-            <div class="pnet ${b.net_cents>=0?'pos':'neg'}">${b.net_cents>=0?'is owed ':'owes '}${money(Math.abs(b.net_cents))}</div>
-          </div>
+            ${m.role==='host'?'<span class="ptag tag-host">Host</span>':''}</div>
         </div>
-        <div class="track"><div class="span" style="left:${start}%;width:${Math.max(end-start,2)}%;background:${colorFor(m.person_id)}"></div></div>
-        <div class="pmeta"><span>IN ${clock(m.joined_at)}</span>
-          <span>${m.left_at ? 'OUT ' + clock(m.left_at) : 'STILL OUT'}</span></div>
+        <div class="pstate">${stateLine}</div>
+        <div class="pnums">
+          <span class="lbl">Paid</span><span class="val">${money(b.paid_cents)}</span>
+          <span class="lbl">Current share</span><span class="val">${money(b.owed_cents)}</span>
+          <span class="lbl">${netLabel}</span><span class="val strong ${netClass}">${money(Math.abs(b.net_cents))}</span>
+        </div>
+        <div class="track" role="img" aria-label="${timelineAria}">
+          <div class="span" style="left:${start}%;width:${Math.max(end-start,2)}%;background:${colorFor(m.person_id)}"></div>
+        </div>
+        <div class="pmeta"><span>Arrived ${clock(m.joined_at)}</span>
+          <span>${m.left_at ? 'Left ' + clock(m.left_at) : 'Present now'}</span></div>
         ${canEdit && isOpen() ? `<div class="pbtns">
-          <button class="mini-btn warn ${!here?'on':''}" data-tap="${m.person_id}">${here?'Tap out':'Tap back in'}</button>
-          <button class="mini-btn ${m.is_dry?'on':''}" data-dry="${m.person_id}">Not drinking</button>
+          <button class="mini-btn warn ${!here?'on':''}" data-tap="${m.person_id}">${here?'Tap Out':'Tap Back In'}</button>
+          <button class="mini-btn ${m.is_dry?'on':''}" data-dry="${m.person_id}"
+            title="${dryExplain}" aria-label="${m.is_dry ? 'Include back in rounds. ' : 'Skip rounds. '}${dryExplain}">${m.is_dry?'Include in Rounds':'Skip Rounds'}</button>
         </div>` : ''}
       </div>`;
     }).join('');
@@ -520,10 +548,21 @@ function renderCrew(){
     if(error) return toast(error.message, true);
   });
 
-  const tc = $('#btnTextCode');
-  if(tc) tc.onclick = async () => {
+  const si = $('#btnShareInvite');
+  if(si) si.onclick = async () => {
     const result = await shareInvite(night.join_code, night.title);
     if(result === 'shared') toast('Shared');
+  };
+  // Same clipboard pattern already used on the "Night Out Started" screen —
+  // not a new copy mechanism, just available here too, ongoing.
+  const cc = $('#btnCopyCode');
+  if(cc) cc.onclick = async () => {
+    try{
+      await navigator.clipboard.writeText(night.join_code);
+      cc.classList.add('copied'); cc.textContent = 'Copied ✓';
+      setTimeout(() => { cc.classList.remove('copied'); cc.textContent = 'Copy Code'; }, 1800);
+      toast('Copied');
+    } catch { toast('Copy failed — code is ' + night.join_code, true); }
   };
 
   const sw = $('#btnSwitchNight');
@@ -531,6 +570,10 @@ function renderCrew(){
 
   const lv = $('#btnLeaveNight');
   if(lv) lv.onclick = confirmLeaveNight;
+
+  // Same Last Call confirmation sheet as the fab — not a second close flow.
+  const cn = $('#btnCloseNight');
+  if(cn) cn.onclick = () => { if(isHost()) confirmLastCall(); };
 }
 
 function confirmSwitchNight(){

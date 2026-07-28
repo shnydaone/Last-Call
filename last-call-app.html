@@ -148,8 +148,21 @@ main::-webkit-scrollbar{width:0}
 .pspend{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;text-align:right}
 .pnet{font-family:'IBM Plex Mono',monospace;font-size:10px;text-align:right;margin-top:2px}
 .pos{color:var(--teal)}.neg{color:var(--magenta)}
+/* Current presence state, in words — "Still out since..." / "Left at...".
+   Sits right under the name so it reads before anything else on the row. */
+.pstate{font-size:12px;color:var(--dim);margin:3px 0 0;line-height:1.4}
+.pstate .qual{color:var(--dim2)}
+/* Paid / Current share / Net — three genuinely different numbers from
+   night_balance (paid_cents, owed_cents, net_cents). Net is the "bottom
+   line" so it gets the strongest treatment; the other two are supporting. */
+.pnums{margin-top:8px;display:grid;grid-template-columns:1fr auto;row-gap:3px;column-gap:12px}
+.pnums .lbl{font-size:11.5px;color:var(--dim2)}
+.pnums .val{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--dim);text-align:right}
+.pnums .val.strong{font-size:13.5px;font-weight:700;color:var(--paper)}
+.pnums .val.pos{color:var(--teal)}
+.pnums .val.neg{color:var(--magenta)}
 .track{height:6px;background:var(--ink3);border-radius:3px;margin:11px 0 8px;position:relative;overflow:hidden}
-.track .span{position:absolute;top:0;bottom:0;border-radius:3px;opacity:.85}
+.track .span{position:absolute;top:0;bottom:0;border-radius:3px;opacity:.85;border:1px solid rgba(0,0,0,.25)}
 .pmeta{display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--dim2)}
 .pbtns{display:flex;gap:6px;margin-top:9px}
 .mini-btn{background:none;border:1px solid var(--line);color:var(--dim2);border-radius:var(--r-sm);
@@ -164,6 +177,24 @@ main::-webkit-scrollbar{width:0}
   font-size:11.5px;line-height:1.55;color:var(--dim);margin-bottom:16px}
 .code-chip{font-family:'IBM Plex Mono',monospace;background:var(--ink3);border:1px solid var(--line);
   border-radius:6px;padding:3px 8px;color:var(--amber-hot);letter-spacing:.14em;font-size:12px}
+
+/* Crew intro card — heading, join-code + invite actions, then a visually
+   separate block for switch/leave/close (lower-priority, some destructive). */
+.crew-intro-head{font-family:'Anton',sans-serif;font-size:15px;letter-spacing:.03em;
+  text-transform:uppercase;color:var(--paper);margin-bottom:5px}
+.crew-code-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:13px}
+.crew-code-label{font-size:11px;color:var(--dim2)}
+.crew-btn{border:none;border-radius:var(--r-sm);min-height:34px;padding:0 13px;
+  font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;cursor:pointer}
+.crew-btn.primary{background:var(--amber);color:var(--ink)}
+.crew-btn.ghost{background:none;border:1px solid var(--line);color:var(--paper)}
+.crew-btn.copied{background:var(--teal);color:var(--ink)}
+.crew-host-actions{margin-top:14px;padding-top:12px;border-top:1px solid var(--ink3);
+  display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.crew-link{background:none;border:none;padding:0;cursor:pointer;
+  font-size:12.5px;font-weight:600;color:var(--dim)}
+.crew-link.danger{color:var(--magenta)}
+.crew-hint{font-size:10.5px;color:var(--dim2);letter-spacing:.02em}
 
 .receipt{background:var(--paper);color:#1A1520;font-family:'IBM Plex Mono',monospace;font-size:11.5px;
   line-height:1.65;padding:22px 20px 26px;position:relative;filter:drop-shadow(0 14px 26px rgba(0,0,0,.5));
@@ -1001,16 +1032,21 @@ function renderCrew(){
   const canLeave = !isHost() || !isOpen();
 
   $('#pane-crew').innerHTML =
-    `<div class="note-box"><b style="color:var(--paper)">Presence drives the split.</b><br>
-      Tap someone out when they leave and every expense logged after that skips them automatically.
-      ${isHost() ? `<br><br>Join code: <span class="code-chip">${night.join_code}</span>
-        <button id="btnTextCode" style="display:inline-block;margin-left:8px;background:var(--amber);
-          color:var(--ink);border:none;border-radius:var(--r-sm);padding:8px 14px;
-          font-size:12px;font-weight:600;cursor:pointer">Share</button>` : ''}
-      <br><br><button class="link" id="btnSwitchNight" style="padding:0">Not this night? Switch</button>
-      <br>${canLeave
-        ? `<button class="link" id="btnLeaveNight" style="padding:0;color:var(--magenta)">Leave this night entirely</button>`
-        : `<span style="font-size:10px;color:var(--dim2);letter-spacing:.08em;text-transform:uppercase">Close the night to leave as host</span>`}
+    `<div class="note-box">
+      <div class="crew-intro-head">Presence drives the split</div>
+      <p style="margin:0">People only split expenses logged while they're out.<br>Tap someone out when they leave.</p>
+      ${isHost() ? `<div class="crew-code-row">
+          <span class="crew-code-label">Join code:</span>
+          <span class="code-chip">${night.join_code}</span>
+          <button class="crew-btn primary" id="btnShareInvite">Share Invite</button>
+          <button class="crew-btn ghost" id="btnCopyCode">Copy Code</button>
+        </div>` : ''}
+      <div class="crew-host-actions">
+        <button class="crew-link" id="btnSwitchNight">Not this night? Switch</button>
+        ${canLeave
+          ? `<button class="crew-link danger" id="btnLeaveNight">Leave this night entirely</button>`
+          : `<button class="crew-link danger" id="btnCloseNight">Close the night</button>`}
+      </div>
     </div>` +
     `<div class="section-lbl">Who was out</div>` +
     members.map(m => {
@@ -1020,24 +1056,47 @@ function renderCrew(){
       const here = presentAt(m, now);
       const isMe = m.person_id === me.id;
       const canEdit = isMe || isHost();
+
+      // Presence state in one sentence — the two things eligible() actually
+      // checks (presentAt, and is_dry for round-kind only), nothing more.
+      const stateLine = here
+        ? `Still out since ${clock(m.joined_at)}${m.is_dry ? ' <span class="qual">· off rounds</span>' : ''}`
+        : `Left at ${clock(m.left_at)}`;
+
+      const netLabel = b.net_cents >= 0 ? 'Is owed' : 'Owes';
+      const netClass = b.net_cents >= 0 ? 'pos' : 'neg';
+
+      const timelineAria = here
+        ? `Present from ${clock(m.joined_at)} to now`
+        : `Present from ${clock(m.joined_at)} to ${clock(m.left_at)}`;
+
+      // The rounds toggle only ever excludes someone from round-kind
+      // expenses (see eligible() — the is_dry check is gated on
+      // kind==='round'). It has no effect on food/other expenses, so the
+      // explanation says that explicitly rather than leaving it implied.
+      const dryExplain = 'Excludes them from drink-round expenses only — food and other expenses still include them while present.';
+
       return `<div class="prow">
         <div class="ptop">
           ${avatar(m.person_id)}
           <div class="pname">${m.person.display_name}${isMe?' (you)':''}
-            ${m.role==='host'?'<span class="ptag tag-host">Host</span>':''}
-            ${m.is_dry?'<span class="ptag tag-dry">Not drinking</span>':''}
-            ${!here?'<span class="ptag tag-gone">Gone</span>':''}</div>
-          <div style="min-width:84px">
-            <div class="pspend">${money(b.owed_cents)}</div>
-            <div class="pnet ${b.net_cents>=0?'pos':'neg'}">${b.net_cents>=0?'is owed ':'owes '}${money(Math.abs(b.net_cents))}</div>
-          </div>
+            ${m.role==='host'?'<span class="ptag tag-host">Host</span>':''}</div>
         </div>
-        <div class="track"><div class="span" style="left:${start}%;width:${Math.max(end-start,2)}%;background:${colorFor(m.person_id)}"></div></div>
-        <div class="pmeta"><span>IN ${clock(m.joined_at)}</span>
-          <span>${m.left_at ? 'OUT ' + clock(m.left_at) : 'STILL OUT'}</span></div>
+        <div class="pstate">${stateLine}</div>
+        <div class="pnums">
+          <span class="lbl">Paid</span><span class="val">${money(b.paid_cents)}</span>
+          <span class="lbl">Current share</span><span class="val">${money(b.owed_cents)}</span>
+          <span class="lbl">${netLabel}</span><span class="val strong ${netClass}">${money(Math.abs(b.net_cents))}</span>
+        </div>
+        <div class="track" role="img" aria-label="${timelineAria}">
+          <div class="span" style="left:${start}%;width:${Math.max(end-start,2)}%;background:${colorFor(m.person_id)}"></div>
+        </div>
+        <div class="pmeta"><span>Arrived ${clock(m.joined_at)}</span>
+          <span>${m.left_at ? 'Left ' + clock(m.left_at) : 'Present now'}</span></div>
         ${canEdit && isOpen() ? `<div class="pbtns">
-          <button class="mini-btn warn ${!here?'on':''}" data-tap="${m.person_id}">${here?'Tap out':'Tap back in'}</button>
-          <button class="mini-btn ${m.is_dry?'on':''}" data-dry="${m.person_id}">Not drinking</button>
+          <button class="mini-btn warn ${!here?'on':''}" data-tap="${m.person_id}">${here?'Tap Out':'Tap Back In'}</button>
+          <button class="mini-btn ${m.is_dry?'on':''}" data-dry="${m.person_id}"
+            title="${dryExplain}" aria-label="${m.is_dry ? 'Include back in rounds. ' : 'Skip rounds. '}${dryExplain}">${m.is_dry?'Include in Rounds':'Skip Rounds'}</button>
         </div>` : ''}
       </div>`;
     }).join('');
@@ -1057,10 +1116,21 @@ function renderCrew(){
     if(error) return toast(error.message, true);
   });
 
-  const tc = $('#btnTextCode');
-  if(tc) tc.onclick = async () => {
+  const si = $('#btnShareInvite');
+  if(si) si.onclick = async () => {
     const result = await shareInvite(night.join_code, night.title);
     if(result === 'shared') toast('Shared');
+  };
+  // Same clipboard pattern already used on the "Night Out Started" screen —
+  // not a new copy mechanism, just available here too, ongoing.
+  const cc = $('#btnCopyCode');
+  if(cc) cc.onclick = async () => {
+    try{
+      await navigator.clipboard.writeText(night.join_code);
+      cc.classList.add('copied'); cc.textContent = 'Copied ✓';
+      setTimeout(() => { cc.classList.remove('copied'); cc.textContent = 'Copy Code'; }, 1800);
+      toast('Copied');
+    } catch { toast('Copy failed — code is ' + night.join_code, true); }
   };
 
   const sw = $('#btnSwitchNight');
@@ -1068,6 +1138,10 @@ function renderCrew(){
 
   const lv = $('#btnLeaveNight');
   if(lv) lv.onclick = confirmLeaveNight;
+
+  // Same Last Call confirmation sheet as the fab — not a second close flow.
+  const cn = $('#btnCloseNight');
+  if(cn) cn.onclick = () => { if(isHost()) confirmLastCall(); };
 }
 
 function confirmSwitchNight(){

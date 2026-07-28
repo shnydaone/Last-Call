@@ -138,8 +138,21 @@ main::-webkit-scrollbar{width:0}
 .pspend{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;text-align:right}
 .pnet{font-family:'IBM Plex Mono',monospace;font-size:10px;text-align:right;margin-top:2px}
 .pos{color:var(--teal)}.neg{color:var(--magenta)}
+/* Current presence state, in words — "Still out since..." / "Left at...".
+   Sits right under the name so it reads before anything else on the row. */
+.pstate{font-size:12px;color:var(--dim);margin:3px 0 0;line-height:1.4}
+.pstate .qual{color:var(--dim2)}
+/* Paid / Current share / Net — three genuinely different numbers from
+   night_balance (paid_cents, owed_cents, net_cents). Net is the "bottom
+   line" so it gets the strongest treatment; the other two are supporting. */
+.pnums{margin-top:8px;display:grid;grid-template-columns:1fr auto;row-gap:3px;column-gap:12px}
+.pnums .lbl{font-size:11.5px;color:var(--dim2)}
+.pnums .val{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--dim);text-align:right}
+.pnums .val.strong{font-size:13.5px;font-weight:700;color:var(--paper)}
+.pnums .val.pos{color:var(--teal)}
+.pnums .val.neg{color:var(--magenta)}
 .track{height:6px;background:var(--ink3);border-radius:3px;margin:11px 0 8px;position:relative;overflow:hidden}
-.track .span{position:absolute;top:0;bottom:0;border-radius:3px;opacity:.85}
+.track .span{position:absolute;top:0;bottom:0;border-radius:3px;opacity:.85;border:1px solid rgba(0,0,0,.25)}
 .pmeta{display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--dim2)}
 .pbtns{display:flex;gap:6px;margin-top:9px}
 .mini-btn{background:none;border:1px solid var(--line);color:var(--dim2);border-radius:var(--r-sm);
@@ -154,6 +167,24 @@ main::-webkit-scrollbar{width:0}
   font-size:11.5px;line-height:1.55;color:var(--dim);margin-bottom:16px}
 .code-chip{font-family:'IBM Plex Mono',monospace;background:var(--ink3);border:1px solid var(--line);
   border-radius:6px;padding:3px 8px;color:var(--amber-hot);letter-spacing:.14em;font-size:12px}
+
+/* Crew intro card — heading, join-code + invite actions, then a visually
+   separate block for switch/leave/close (lower-priority, some destructive). */
+.crew-intro-head{font-family:'Anton',sans-serif;font-size:15px;letter-spacing:.03em;
+  text-transform:uppercase;color:var(--paper);margin-bottom:5px}
+.crew-code-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:13px}
+.crew-code-label{font-size:11px;color:var(--dim2)}
+.crew-btn{border:none;border-radius:var(--r-sm);min-height:34px;padding:0 13px;
+  font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;cursor:pointer}
+.crew-btn.primary{background:var(--amber);color:var(--ink)}
+.crew-btn.ghost{background:none;border:1px solid var(--line);color:var(--paper)}
+.crew-btn.copied{background:var(--teal);color:var(--ink)}
+.crew-host-actions{margin-top:14px;padding-top:12px;border-top:1px solid var(--ink3);
+  display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.crew-link{background:none;border:none;padding:0;cursor:pointer;
+  font-size:12.5px;font-weight:600;color:var(--dim)}
+.crew-link.danger{color:var(--magenta)}
+.crew-hint{font-size:10.5px;color:var(--dim2);letter-spacing:.02em}
 
 .receipt{background:var(--paper);color:#1A1520;font-family:'IBM Plex Mono',monospace;font-size:11.5px;
   line-height:1.65;padding:22px 20px 26px;position:relative;filter:drop-shadow(0 14px 26px rgba(0,0,0,.5));
