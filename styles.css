@@ -177,32 +177,41 @@ main::-webkit-scrollbar{width:0}
 .lastcall small{display:block;font-family:'IBM Plex Mono',monospace;font-size:9.5px;
   letter-spacing:.1em;opacity:.85;margin-top:5px;font-weight:400}
 
-.prow{padding:14px 0;border-bottom:1px solid var(--ink3)}
-.prow:last-child{border:none}
-.ptop{display:flex;align-items:center;gap:12px}
-.pname{flex:1;min-width:0;overflow-wrap:anywhere;font-size:14px;font-weight:600}
 .ptag{font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
   border-radius:var(--r-sm);padding:2px 6px;margin-left:6px}
 .tag-dry{color:var(--teal);border:1px solid rgba(61,217,176,.4)}
 .tag-gone{color:var(--magenta);border:1px solid rgba(255,77,141,.4)}
 .tag-host{color:var(--amber);border:1px solid rgba(232,163,61,.4)}
-.pspend{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;text-align:right}
-.pnet{font-family:'IBM Plex Mono',monospace;font-size:10px;text-align:right;margin-top:2px}
-.pos{color:var(--teal)}.neg{color:var(--magenta)}
-/* Current presence state, in words — "Still out since..." / "Left at...".
-   Sits right under the name so it reads before anything else on the row. */
-.pstate{font-size:12px;color:var(--dim);margin:3px 0 0;line-height:1.4}
-.pstate .qual{color:var(--dim2)}
-/* Paid / Current share / Net — three genuinely different numbers from
-   night_balance (paid_cents, owed_cents, net_cents). Net is the "bottom
-   line" so it gets the strongest treatment; the other two are supporting. */
-.pnums{margin-top:8px;display:grid;grid-template-columns:1fr auto;row-gap:3px;column-gap:12px}
-.pnums .lbl{font-size:11.5px;color:var(--dim2)}
-.pnums .val{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--dim);text-align:right}
-.pnums .val.strong{font-size:13.5px;font-weight:700;color:var(--paper)}
-.pnums .val.pos{color:var(--teal)}
-.pnums .val.neg{color:var(--magenta)}
-.track{height:6px;background:var(--ink3);border-radius:3px;margin:11px 0 8px;position:relative;overflow:hidden}
+
+/* Crew card — compact collapsed state answering "who / present? /
+   financial position?" at a glance; everything else (timeline, exact
+   arrival/departure, current share, Tap Out, Skip Rounds) lives in
+   .cc-expand, revealed by tapping anywhere on the card that isn't one
+   of those controls. Only one card open at a time (expandedMember). */
+.crew-card{padding:13px 0;border-bottom:1px solid var(--ink3);cursor:pointer}
+.crew-card:last-child{border:none}
+.crew-card:focus-visible{outline:2px solid var(--amber-hot);outline-offset:-2px;border-radius:var(--r-sm)}
+.cc-top{display:flex;align-items:center;gap:11px}
+.cc-identity{flex:1;min-width:0}
+.cc-name{overflow-wrap:anywhere;font-size:14px;font-weight:600;color:var(--paper)}
+.cc-you{font-weight:500;color:var(--dim2)}
+.cc-status{font-size:11.5px;color:var(--dim);margin-top:2px}
+.cc-financial{flex-shrink:0;text-align:right}
+.cc-settlement{font-family:'IBM Plex Mono',monospace;font-size:13.5px;font-weight:700;
+  white-space:nowrap;font-variant-numeric:tabular-nums}
+.cc-settlement.pos{color:var(--teal)}
+.cc-settlement.neg{color:var(--magenta)}
+.cc-settlement.settled{color:var(--dim2)}
+.cc-paid{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dim2);margin-top:1px;
+  font-variant-numeric:tabular-nums}
+.cc-chev{flex-shrink:0;color:var(--dim2);transition:transform .15s ease-out}
+.crew-card[aria-expanded="true"] .cc-chev{transform:rotate(90deg)}
+.cc-expand{margin-top:12px;padding-top:12px;border-top:1px solid var(--ink3)}
+.cc-share-row{display:flex;justify-content:space-between;align-items:baseline;margin:9px 0 0;
+  font-family:'IBM Plex Mono',monospace}
+.cc-share-row .lbl{font-size:11.5px;color:var(--dim2)}
+.cc-share-row .val{font-size:13px;font-weight:600;color:var(--paper);font-variant-numeric:tabular-nums}
+.track{height:6px;background:var(--ink3);border-radius:3px;margin:2px 0 8px;position:relative;overflow:hidden}
 .track .span{position:absolute;top:0;bottom:0;border-radius:3px;opacity:.85;border:1px solid rgba(0,0,0,.25)}
 .pmeta{display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--dim2)}
 .pbtns{display:flex;gap:6px;margin-top:9px}

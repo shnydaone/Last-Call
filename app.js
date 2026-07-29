@@ -14,6 +14,7 @@ let stops = [];
 let expenses = [];          // with allocations attached
 let balances = [];
 let plan = [];              // settle_night rows
+let expandedMember = null;  // person_id of the one open Crew card, or null
 
 
 const M   = id => members.find(m => m.person_id === id);
@@ -512,6 +513,19 @@ function viewReceipt(url){
   $('#receiptViewClose').onclick = hideOverlay;
 }
 
+// Settlement wording — narrowly scoped to this card for now (Prompt 3
+// centralizes this display system across the app; this one function is
+// exactly what it'll consolidate). Sign convention confirmed directly
+// against the night_balance view definition, not assumed from the old
+// label: net_cents = paid_cents - owed_cents, so positive means you paid
+// more than your share (money comes back to you), negative means you
+// paid less than your share (you owe the difference).
+function settlementDisplay(netCents){
+  if(netCents === 0) return { text: 'Settled', cls: 'settled' };
+  if(netCents > 0)   return { text: `Gets back ${money(netCents)}`, cls: 'pos' };
+  return { text: `Owes ${money(Math.abs(netCents))}`, cls: 'neg' };
+}
+
 function renderCrew(){
   const now = new Date();
   const t0 = members.length ? new Date(members[0].joined_at) : now;
@@ -532,15 +546,12 @@ function renderCrew(){
       const here = presentAt(m, now);
       const isMe = m.person_id === me.id;
       const canEdit = isMe || isHost();
+      const expanded = expandedMember === m.person_id;
+      const settle = settlementDisplay(b.net_cents);
 
-      // Presence state in one sentence — the two things eligible() actually
-      // checks (presentAt, and is_dry for round-kind only), nothing more.
-      const stateLine = here
-        ? `Still out since ${clock(m.joined_at)}${m.is_dry ? ' <span class="qual">· off rounds</span>' : ''}`
-        : `Left at ${clock(m.left_at)}`;
-
-      const netLabel = b.net_cents >= 0 ? 'Is owed' : 'Owes';
-      const netClass = b.net_cents >= 0 ? 'pos' : 'neg';
+      // One concise line in the collapsed card — full arrival/departure
+      // detail moves to the expanded view instead of doubling up here.
+      const attendanceLabel = here ? 'Present' : `Left at ${clock(m.left_at)}`;
 
       const timelineAria = here
         ? `Present from ${clock(m.joined_at)} to now`
@@ -552,32 +563,53 @@ function renderCrew(){
       // explanation says that explicitly rather than leaving it implied.
       const dryExplain = 'Excludes them from drink-round expenses only — food and other expenses still include them while present.';
 
-      return `<div class="prow">
-        <div class="ptop">
+      const accessibleName = `${m.person.display_name}${isMe?' (you)':''}${m.role==='host'?', host':''}, ${attendanceLabel}, ${settle.text}`;
+
+      return `<div class="crew-card" data-member="${m.person_id}" role="button" tabindex="0"
+          aria-expanded="${expanded}" aria-label="${escapeHtml(accessibleName)}">
+        <div class="cc-top">
           ${avatar(m.person_id)}
-          <div class="pname">${m.person.display_name}${isMe?' (you)':''}
-            ${m.role==='host'?'<span class="ptag tag-host">Host</span>':''}</div>
+          <div class="cc-identity">
+            <div class="cc-name">${m.person.display_name}${isMe?' <span class="cc-you">(you)</span>':''}
+              ${m.role==='host'?'<span class="ptag tag-host">Host</span>':''}</div>
+            <div class="cc-status">${attendanceLabel}</div>
+          </div>
+          <div class="cc-financial">
+            <div class="cc-settlement ${settle.cls}">${settle.text}</div>
+            <div class="cc-paid">Paid ${money(b.paid_cents)}</div>
+          </div>
+          <svg class="cc-chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
         </div>
-        <div class="pstate">${stateLine}</div>
-        <div class="pnums">
-          <span class="lbl">Paid</span><span class="val">${money(b.paid_cents)}</span>
-          <span class="lbl">Current share</span><span class="val">${money(b.owed_cents)}</span>
-          <span class="lbl">${netLabel}</span><span class="val strong ${netClass}">${money(Math.abs(b.net_cents))}</span>
+        <div class="cc-expand" style="${expanded?'':'display:none'}">
+          <div class="track" role="img" aria-label="${timelineAria}">
+            <div class="span" style="left:${start}%;width:${Math.max(end-start,2)}%;background:${colorFor(m.person_id)}"></div>
+          </div>
+          <div class="pmeta"><span>Arrived ${clock(m.joined_at)}</span>
+            <span>${m.left_at ? 'Left ' + clock(m.left_at) : 'Present now'}</span></div>
+          <div class="cc-share-row"><span class="lbl">Current share</span><span class="val">${money(b.owed_cents)}</span></div>
+          ${canEdit && isOpen() ? `<div class="pbtns">
+            <button class="mini-btn warn ${!here?'on':''}" data-tap="${m.person_id}">${here?'Tap Out':'Tap Back In'}</button>
+            <button class="mini-btn ${m.is_dry?'on':''}" data-dry="${m.person_id}"
+              title="${dryExplain}" aria-label="${m.is_dry ? 'Include back in rounds. ' : 'Skip rounds. '}${dryExplain}">${m.is_dry?'Include in Rounds':'Skip Rounds'}</button>
+          </div>` : ''}
         </div>
-        <div class="track" role="img" aria-label="${timelineAria}">
-          <div class="span" style="left:${start}%;width:${Math.max(end-start,2)}%;background:${colorFor(m.person_id)}"></div>
-        </div>
-        <div class="pmeta"><span>Arrived ${clock(m.joined_at)}</span>
-          <span>${m.left_at ? 'Left ' + clock(m.left_at) : 'Present now'}</span></div>
-        ${canEdit && isOpen() ? `<div class="pbtns">
-          <button class="mini-btn warn ${!here?'on':''}" data-tap="${m.person_id}">${here?'Tap Out':'Tap Back In'}</button>
-          <button class="mini-btn ${m.is_dry?'on':''}" data-dry="${m.person_id}"
-            title="${dryExplain}" aria-label="${m.is_dry ? 'Include back in rounds. ' : 'Skip rounds. '}${dryExplain}">${m.is_dry?'Include in Rounds':'Skip Rounds'}</button>
-        </div>` : ''}
       </div>`;
     }).join('');
 
-  $('#pane-crew').querySelectorAll('[data-tap]').forEach(b => b.onclick = async () => {
+  $('#pane-crew').querySelectorAll('.crew-card').forEach(card => {
+    const toggle = () => {
+      expandedMember = expandedMember === card.dataset.member ? null : card.dataset.member;
+      renderCrew();
+    };
+    card.onclick = toggle;
+    card.onkeydown = ev => {
+      if(ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); toggle(); }
+    };
+  });
+  // stopPropagation so pressing these never also toggles the card closed —
+  // same reasoning as the flag button on round cards elsewhere in the app.
+  $('#pane-crew').querySelectorAll('[data-tap]').forEach(b => b.onclick = async ev => {
+    ev.stopPropagation();
     const m = M(b.dataset.tap), now = new Date();
     const patch = presentAt(m, now) ? { left_at: now.toISOString() } : { left_at: null };
     const { error } = await sb.from('night_member').update(patch)
@@ -585,7 +617,8 @@ function renderCrew(){
     if(error) return toast(error.message, true);
     toast(patch.left_at ? `${nameOf(m.person_id)} tapped out` : `${nameOf(m.person_id)} is back in`);
   });
-  $('#pane-crew').querySelectorAll('[data-dry]').forEach(b => b.onclick = async () => {
+  $('#pane-crew').querySelectorAll('[data-dry]').forEach(b => b.onclick = async ev => {
+    ev.stopPropagation();
     const m = M(b.dataset.dry);
     const { error } = await sb.from('night_member').update({ is_dry: !m.is_dry })
       .eq('night_id', night.id).eq('person_id', m.person_id);
@@ -593,7 +626,7 @@ function renderCrew(){
   });
 
   const ib = $('#btnInviteCrew');
-  if(ib) ib.onclick = showJoinCode;
+  if(ib) ib.onclick = ev => { ev.stopPropagation(); showJoinCode(); };
 }
 
 function confirmSwitchNight(){
@@ -1441,8 +1474,10 @@ function showJoinCode(){
       <div class="qr-wrap"><canvas id="qrCanvas"></canvas></div>
       <button id="shareInviteBtn" style="margin-top:4px">Share Invite</button>
       <button class="secondary" id="copyCode">Copy Code</button>
+      <button class="secondary" id="joinCodeDone" style="margin-top:8px">Done</button>
     </div>`;
   renderInviteQR($('#qrCanvas'), inviteUrl).catch(e => console.error('QR render failed:', e));
+  $('#joinCodeDone').onclick = hideOverlay;
   $('#shareInviteBtn').onclick = async () => {
     const result = await shareInvite(night.join_code, night.title);
     if(result === 'shared') toast('Shared');
