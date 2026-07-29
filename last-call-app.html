@@ -97,6 +97,7 @@ header{display:flex;align-items:center;gap:9px;flex-shrink:0;
 .ht-menu-item{display:block;width:100%;text-align:left;background:none;border:none;cursor:pointer;
   min-height:44px;padding:11px 14px;border-radius:var(--r-sm);
   font-family:'Archivo',sans-serif;font-size:14px;font-weight:500;color:var(--paper)}
+.ht-menu-divider{height:1px;background:var(--ink3);margin:5px 4px}
 .ht-menu-item:hover{background:var(--ink3)}
 .ht-menu-item.danger{color:var(--magenta)}
 @media (max-width:340px){
@@ -234,44 +235,17 @@ main::-webkit-scrollbar{width:0}
   text-transform:uppercase;color:var(--dim2);margin:6px 0 6px}
 .note-box{background:var(--ink2);border:1px solid var(--ink3);border-radius:var(--r-md);padding:13px;
   font-size:11.5px;line-height:1.55;color:var(--dim);margin-bottom:16px}
-.code-chip{font-family:'IBM Plex Mono',monospace;background:var(--ink3);border:1px solid var(--line);
-  border-radius:6px;padding:3px 8px;color:var(--amber-hot);letter-spacing:.14em;font-size:12px}
 
-/* Crew intro card — collapsed by default. <summary> is the whole tap
-   target (native keyboard/screen-reader disclosure semantics for free);
-   the default marker is replaced with a rotating chevron so the "closed
-   vs open" state doesn't rely on a browser-default triangle alone. */
-.crew-intro{background:var(--ink2);border:1px solid var(--ink3);border-radius:var(--r-md);
-  margin-bottom:16px;overflow:hidden}
-.crew-intro-summary{list-style:none;cursor:pointer;padding:13px;min-height:56px;
-  display:flex;align-items:center;justify-content:space-between;gap:10px}
-.crew-intro-summary::-webkit-details-marker{display:none}
-.crew-intro-summary::after{content:'⌄';font-size:16px;color:var(--dim2);flex-shrink:0;
-  transition:transform .15s}
-.crew-intro[open] .crew-intro-summary::after{transform:rotate(180deg)}
-.crew-intro-head{flex:1;min-width:0;font-family:'Anton',sans-serif;font-size:15px;letter-spacing:.03em;
-  text-transform:uppercase;color:var(--paper)}
-.crew-intro-hint{font-size:10.5px;color:var(--dim2);letter-spacing:.02em;
-  flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.crew-intro-body{padding:0 13px 13px;font-size:11.5px;line-height:1.55;color:var(--dim)}
-@media (max-width:340px){
-  .crew-intro-hint{display:none}
-}
-.crew-code-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:13px}
-.crew-code-label{font-size:11px;color:var(--dim2)}
-.crew-btn{border:none;border-radius:var(--r-sm);min-height:var(--tap-min);padding:0 13px;
-  display:inline-flex;align-items:center;justify-content:center;
-  font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;cursor:pointer}
-.crew-btn.primary{background:var(--amber);color:var(--ink)}
-.crew-btn.ghost{background:none;border:1px solid var(--line);color:var(--paper)}
-.crew-btn.copied{background:var(--teal);color:var(--ink)}
-.crew-host-actions{margin-top:14px;padding-top:12px;border-top:1px solid var(--ink3);
-  display:flex;flex-direction:column;align-items:flex-start;gap:10px}
-.crew-link{background:none;border:none;padding:0;cursor:pointer;min-height:var(--tap-min);
-  display:flex;align-items:center;
-  font-size:12.5px;font-weight:600;color:var(--dim)}
-.crew-link.danger{color:var(--magenta)}
-.crew-hint{font-size:10.5px;color:var(--dim2);letter-spacing:.02em}
+/* Crew utility row — replaces the old accordion entirely. Reuses the
+   existing "Who was out" section label as the left side rather than
+   adding a second, redundant label; Invite+ is the one action here. */
+.crew-utility-row{display:flex;align-items:center;justify-content:space-between;
+  gap:10px;margin-bottom:14px}
+.invite-btn{display:inline-flex;align-items:center;gap:6px;background:none;
+  border:1.5px solid var(--teal);color:var(--teal);border-radius:var(--r-full);
+  min-height:44px;padding:0 16px;font-family:'Archivo',sans-serif;font-size:13px;
+  font-weight:700;letter-spacing:.02em;cursor:pointer}
+.invite-btn:hover{background:rgba(61,217,176,.1)}
 
 .receipt{background:var(--paper);color:#1A1520;font-family:'IBM Plex Mono',monospace;font-size:12px;
   line-height:1.7;padding:22px 20px 26px;position:relative;filter:drop-shadow(0 14px 26px rgba(0,0,0,.5));
@@ -605,9 +579,12 @@ main::-webkit-scrollbar{width:0}
   </header>
   <div class="ht-menu" id="htMenu" role="menu" aria-label="Night options" style="display:none">
     <button class="ht-menu-item" id="htGuide" role="menuitem">How this works</button>
+    <div class="ht-menu-divider" role="separator"></div>
+    <button class="ht-menu-item" id="htJoinCode" role="menuitem">Show join code</button>
+    <button class="ht-menu-item" id="htShareNight" role="menuitem">Share night</button>
     <button class="ht-menu-item" id="htSwitchNight" role="menuitem">Switch night</button>
-    <button class="ht-menu-item danger" id="htLeaveNight" role="menuitem" style="display:none">Leave this night entirely</button>
-    <button class="ht-menu-item danger" id="htCloseNight" role="menuitem" style="display:none">Close the night</button>
+    <div class="ht-menu-divider" role="separator"></div>
+    <button class="ht-menu-item danger" id="htLeaveNight" role="menuitem">Leave this night entirely</button>
   </div>
 
   <nav role="tablist">
@@ -909,9 +886,6 @@ let stops = [];
 let expenses = [];          // with allocations attached
 let balances = [];
 let plan = [];              // settle_night rows
-let crewIntroOpen = false;  // Crew intro card starts collapsed; <details> loses
-                             // its own open state whenever we rebuild the pane's
-                             // innerHTML, so this is the real source of truth.
 
 
 const M   = id => members.find(m => m.person_id === id);
@@ -1287,7 +1261,6 @@ function renderHeader(){
   liveEl.setAttribute('aria-label', isOpen() ? 'Night is live' : 'Night has ended');
 
   updateFabVisibility();
-  updateNightMenu();
 
   const lcFab = $('#btnLastCallFab');
   if(lcFab){
@@ -1417,22 +1390,13 @@ function renderCrew(){
   const span = Math.max(now - t0, 1);
 
   $('#pane-crew').innerHTML =
-    `<details class="crew-intro" id="crewIntro" ${crewIntroOpen ? 'open' : ''}>
-      <summary class="crew-intro-summary">
-        <span class="crew-intro-head">Only pay for what you were there for</span>
-        <span class="crew-intro-hint">Join code &amp; share</span>
-      </summary>
-      <div class="crew-intro-body">
-        <p style="margin:0">People only split expenses logged while they're out.<br>Tap someone out when they leave.</p>
-        ${isHost() ? `<div class="crew-code-row">
-            <span class="crew-code-label">Join code:</span>
-            <span class="code-chip">${night.join_code}</span>
-            <button class="crew-btn primary" id="btnShareInvite">Share Invite</button>
-            <button class="crew-btn ghost" id="btnCopyCode">Copy Code</button>
-          </div>` : ''}
-      </div>
-    </details>` +
-    `<div class="section-lbl">Who was out</div>` +
+    `<div class="crew-utility-row">
+      <span class="section-lbl" style="margin:0">Who was out</span>
+      ${isHost() ? `<button class="invite-btn" id="btnInviteCrew" aria-label="Invite people to this night">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          Invite
+        </button>` : ''}
+    </div>` +
     members.map(m => {
       const b = balances.find(x => x.person_id === m.person_id) ?? {paid_cents:0,owed_cents:0,net_cents:0};
       const jt = new Date(m.joined_at), lt = m.left_at ? new Date(m.left_at) : now;
@@ -1500,25 +1464,8 @@ function renderCrew(){
     if(error) return toast(error.message, true);
   });
 
-  const si = $('#btnShareInvite');
-  if(si) si.onclick = async () => {
-    const result = await shareInvite(night.join_code, night.title);
-    if(result === 'shared') toast('Shared');
-  };
-  // Same clipboard pattern already used on the "Night Out Started" screen —
-  // not a new copy mechanism, just available here too, ongoing.
-  const cc = $('#btnCopyCode');
-  if(cc) cc.onclick = async () => {
-    try{
-      await navigator.clipboard.writeText(night.join_code);
-      cc.classList.add('copied'); cc.textContent = 'Copied ✓';
-      setTimeout(() => { cc.classList.remove('copied'); cc.textContent = 'Copy Code'; }, 1800);
-      toast('Copied');
-    } catch { toast('Copy failed — code is ' + night.join_code, true); }
-  };
-
-  const ci = $('#crewIntro');
-  ci.ontoggle = () => { crewIntroOpen = ci.open; };
+  const ib = $('#btnInviteCrew');
+  if(ib) ib.onclick = showJoinCode;
 }
 
 function confirmSwitchNight(){
@@ -2305,35 +2252,83 @@ function showGuide(){
 
 $('#htMark').innerHTML = compactMark();
 
-// Overflow menu — the shared integration point for this and future
-// prompts. Populated only with actions that already had real, working
-// handlers elsewhere (Crew's former intro-card buttons, the old info
-// guide button) — no empty/disabled placeholders for Join Code or
-// Share, which are explicitly deferred to a later prompt.
-function updateNightMenu(){
-  const canLeave = !isHost() || !isOpen();
-  $('#htLeaveNight').style.display = canLeave ? 'block' : 'none';
-  $('#htCloseNight').style.display = canLeave ? 'none' : 'block';
-}
-function closeNightMenu(){
+// Overflow menu — the shared integration point from Prompt 0. This pass
+// adds Show join code / Share night, and removes the old conditional
+// Leave/Close swap: Close/End night is explicitly Prompt 4's to build,
+// so it's not exposed here at all (confirmLastCall() itself is untouched
+// and still reachable via the bottom action tray's own Last Call button —
+// this menu just no longer calls it).
+//
+// Leave night is now always shown, not conditionally hidden for hosts.
+// Checked the actual leave_night() RPC directly rather than assume: it
+// already has a check-constraint guard that blocks deleting a host's
+// membership while the night is open, caught and re-raised as a clear
+// message ("Close the night before leaving as host") — so the rare
+// only-host case surfaces as an understandable error via the existing
+// confirmLeaveNight() error handling, rather than being silently
+// prevented by hiding the menu item with no explanation.
+function closeNightMenu(returnFocus){
   $('#htMenu').style.display = 'none';
   $('#htMenuBtn').setAttribute('aria-expanded', 'false');
+  if(returnFocus !== false) $('#htMenuBtn').focus();
 }
 $('#htMenuBtn').onclick = () => {
   const open = $('#htMenu').style.display === 'block';
-  $('#htMenu').style.display = open ? 'none' : 'block';
-  $('#htMenuBtn').setAttribute('aria-expanded', String(!open));
+  if(open){ closeNightMenu(false); return; }
+  $('#htMenu').style.display = 'block';
+  $('#htMenuBtn').setAttribute('aria-expanded', 'true');
+  // Move focus into the menu, per this prompt's explicit requirement —
+  // Prompt 0 didn't need this since it was a much simpler menu.
+  $('#htMenu').querySelector('.ht-menu-item')?.focus();
 };
 document.addEventListener('click', e => {
   if($('#htMenu').style.display === 'block' &&
      !$('#htMenu').contains(e.target) && !$('#htMenuBtn').contains(e.target)){
-    closeNightMenu();
+    closeNightMenu(false);
   }
 });
-$('#htGuide').onclick = () => { closeNightMenu(); showGuide(); };
-$('#htSwitchNight').onclick = () => { closeNightMenu(); confirmSwitchNight(); };
-$('#htLeaveNight').onclick  = () => { closeNightMenu(); confirmLeaveNight(); };
-$('#htCloseNight').onclick  = () => { closeNightMenu(); if(isHost()) confirmLastCall(); };
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape' && $('#htMenu').style.display === 'block') closeNightMenu();
+});
+$('#htGuide').onclick       = () => { closeNightMenu(false); showGuide(); };
+$('#htJoinCode').onclick    = () => { closeNightMenu(false); showJoinCode(); };
+$('#htShareNight').onclick  = async () => {
+  closeNightMenu(false);
+  const result = await shareInvite(night.join_code, night.title);
+  if(result === 'shared') toast('Shared');
+};
+$('#htSwitchNight').onclick = () => { closeNightMenu(false); confirmSwitchNight(); };
+$('#htLeaveNight').onclick  = () => { closeNightMenu(false); confirmLeaveNight(); };
+
+// Consolidated invite flow — reuses the exact same code+QR+copy pattern
+// as showNightCreated() (shown right after creating a night), so there's
+// one invite presentation, not two. Triggered by both "Show join code"
+// in this menu and the new Invite+ button on Crew.
+function showJoinCode(){
+  overlay('Invite', 'Share this code, or let them scan in.');
+  const inviteUrl = `${location.origin}${location.pathname}?code=${night.join_code}`;
+  $('#ovBody').innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px;width:100%">
+      <div class="code-display">${groupCode(night.join_code)}</div>
+      <div class="qr-wrap"><canvas id="qrCanvas"></canvas></div>
+      <button id="shareInviteBtn" style="margin-top:4px">Share Invite</button>
+      <button class="secondary" id="copyCode">Copy Code</button>
+    </div>`;
+  renderInviteQR($('#qrCanvas'), inviteUrl).catch(e => console.error('QR render failed:', e));
+  $('#shareInviteBtn').onclick = async () => {
+    const result = await shareInvite(night.join_code, night.title);
+    if(result === 'shared') toast('Shared');
+  };
+  $('#copyCode').onclick = async () => {
+    try{
+      await navigator.clipboard.writeText(night.join_code);
+      const btn = $('#copyCode');
+      btn.classList.add('copied'); btn.textContent = 'Copied ✓';
+      setTimeout(() => { btn.classList.remove('copied'); btn.textContent = 'Copy Code'; }, 1800);
+      toast('Copied');
+    } catch { toast('Copy failed — code is ' + night.join_code, true); }
+  };
+}
 
 boot().catch(e => overlay('Something broke', e.message));
 

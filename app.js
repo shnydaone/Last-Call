@@ -14,9 +14,6 @@ let stops = [];
 let expenses = [];          // with allocations attached
 let balances = [];
 let plan = [];              // settle_night rows
-let crewIntroOpen = false;  // Crew intro card starts collapsed; <details> loses
-                             // its own open state whenever we rebuild the pane's
-                             // innerHTML, so this is the real source of truth.
 
 
 const M   = id => members.find(m => m.person_id === id);
@@ -392,7 +389,6 @@ function renderHeader(){
   liveEl.setAttribute('aria-label', isOpen() ? 'Night is live' : 'Night has ended');
 
   updateFabVisibility();
-  updateNightMenu();
 
   const lcFab = $('#btnLastCallFab');
   if(lcFab){
@@ -522,22 +518,13 @@ function renderCrew(){
   const span = Math.max(now - t0, 1);
 
   $('#pane-crew').innerHTML =
-    `<details class="crew-intro" id="crewIntro" ${crewIntroOpen ? 'open' : ''}>
-      <summary class="crew-intro-summary">
-        <span class="crew-intro-head">Only pay for what you were there for</span>
-        <span class="crew-intro-hint">Join code &amp; share</span>
-      </summary>
-      <div class="crew-intro-body">
-        <p style="margin:0">People only split expenses logged while they're out.<br>Tap someone out when they leave.</p>
-        ${isHost() ? `<div class="crew-code-row">
-            <span class="crew-code-label">Join code:</span>
-            <span class="code-chip">${night.join_code}</span>
-            <button class="crew-btn primary" id="btnShareInvite">Share Invite</button>
-            <button class="crew-btn ghost" id="btnCopyCode">Copy Code</button>
-          </div>` : ''}
-      </div>
-    </details>` +
-    `<div class="section-lbl">Who was out</div>` +
+    `<div class="crew-utility-row">
+      <span class="section-lbl" style="margin:0">Who was out</span>
+      ${isHost() ? `<button class="invite-btn" id="btnInviteCrew" aria-label="Invite people to this night">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          Invite
+        </button>` : ''}
+    </div>` +
     members.map(m => {
       const b = balances.find(x => x.person_id === m.person_id) ?? {paid_cents:0,owed_cents:0,net_cents:0};
       const jt = new Date(m.joined_at), lt = m.left_at ? new Date(m.left_at) : now;
@@ -605,25 +592,8 @@ function renderCrew(){
     if(error) return toast(error.message, true);
   });
 
-  const si = $('#btnShareInvite');
-  if(si) si.onclick = async () => {
-    const result = await shareInvite(night.join_code, night.title);
-    if(result === 'shared') toast('Shared');
-  };
-  // Same clipboard pattern already used on the "Night Out Started" screen —
-  // not a new copy mechanism, just available here too, ongoing.
-  const cc = $('#btnCopyCode');
-  if(cc) cc.onclick = async () => {
-    try{
-      await navigator.clipboard.writeText(night.join_code);
-      cc.classList.add('copied'); cc.textContent = 'Copied ✓';
-      setTimeout(() => { cc.classList.remove('copied'); cc.textContent = 'Copy Code'; }, 1800);
-      toast('Copied');
-    } catch { toast('Copy failed — code is ' + night.join_code, true); }
-  };
-
-  const ci = $('#crewIntro');
-  ci.ontoggle = () => { crewIntroOpen = ci.open; };
+  const ib = $('#btnInviteCrew');
+  if(ib) ib.onclick = showJoinCode;
 }
 
 function confirmSwitchNight(){
@@ -1410,34 +1380,82 @@ function showGuide(){
 
 $('#htMark').innerHTML = compactMark();
 
-// Overflow menu — the shared integration point for this and future
-// prompts. Populated only with actions that already had real, working
-// handlers elsewhere (Crew's former intro-card buttons, the old info
-// guide button) — no empty/disabled placeholders for Join Code or
-// Share, which are explicitly deferred to a later prompt.
-function updateNightMenu(){
-  const canLeave = !isHost() || !isOpen();
-  $('#htLeaveNight').style.display = canLeave ? 'block' : 'none';
-  $('#htCloseNight').style.display = canLeave ? 'none' : 'block';
-}
-function closeNightMenu(){
+// Overflow menu — the shared integration point from Prompt 0. This pass
+// adds Show join code / Share night, and removes the old conditional
+// Leave/Close swap: Close/End night is explicitly Prompt 4's to build,
+// so it's not exposed here at all (confirmLastCall() itself is untouched
+// and still reachable via the bottom action tray's own Last Call button —
+// this menu just no longer calls it).
+//
+// Leave night is now always shown, not conditionally hidden for hosts.
+// Checked the actual leave_night() RPC directly rather than assume: it
+// already has a check-constraint guard that blocks deleting a host's
+// membership while the night is open, caught and re-raised as a clear
+// message ("Close the night before leaving as host") — so the rare
+// only-host case surfaces as an understandable error via the existing
+// confirmLeaveNight() error handling, rather than being silently
+// prevented by hiding the menu item with no explanation.
+function closeNightMenu(returnFocus){
   $('#htMenu').style.display = 'none';
   $('#htMenuBtn').setAttribute('aria-expanded', 'false');
+  if(returnFocus !== false) $('#htMenuBtn').focus();
 }
 $('#htMenuBtn').onclick = () => {
   const open = $('#htMenu').style.display === 'block';
-  $('#htMenu').style.display = open ? 'none' : 'block';
-  $('#htMenuBtn').setAttribute('aria-expanded', String(!open));
+  if(open){ closeNightMenu(false); return; }
+  $('#htMenu').style.display = 'block';
+  $('#htMenuBtn').setAttribute('aria-expanded', 'true');
+  // Move focus into the menu, per this prompt's explicit requirement —
+  // Prompt 0 didn't need this since it was a much simpler menu.
+  $('#htMenu').querySelector('.ht-menu-item')?.focus();
 };
 document.addEventListener('click', e => {
   if($('#htMenu').style.display === 'block' &&
      !$('#htMenu').contains(e.target) && !$('#htMenuBtn').contains(e.target)){
-    closeNightMenu();
+    closeNightMenu(false);
   }
 });
-$('#htGuide').onclick = () => { closeNightMenu(); showGuide(); };
-$('#htSwitchNight').onclick = () => { closeNightMenu(); confirmSwitchNight(); };
-$('#htLeaveNight').onclick  = () => { closeNightMenu(); confirmLeaveNight(); };
-$('#htCloseNight').onclick  = () => { closeNightMenu(); if(isHost()) confirmLastCall(); };
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape' && $('#htMenu').style.display === 'block') closeNightMenu();
+});
+$('#htGuide').onclick       = () => { closeNightMenu(false); showGuide(); };
+$('#htJoinCode').onclick    = () => { closeNightMenu(false); showJoinCode(); };
+$('#htShareNight').onclick  = async () => {
+  closeNightMenu(false);
+  const result = await shareInvite(night.join_code, night.title);
+  if(result === 'shared') toast('Shared');
+};
+$('#htSwitchNight').onclick = () => { closeNightMenu(false); confirmSwitchNight(); };
+$('#htLeaveNight').onclick  = () => { closeNightMenu(false); confirmLeaveNight(); };
+
+// Consolidated invite flow — reuses the exact same code+QR+copy pattern
+// as showNightCreated() (shown right after creating a night), so there's
+// one invite presentation, not two. Triggered by both "Show join code"
+// in this menu and the new Invite+ button on Crew.
+function showJoinCode(){
+  overlay('Invite', 'Share this code, or let them scan in.');
+  const inviteUrl = `${location.origin}${location.pathname}?code=${night.join_code}`;
+  $('#ovBody').innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px;width:100%">
+      <div class="code-display">${groupCode(night.join_code)}</div>
+      <div class="qr-wrap"><canvas id="qrCanvas"></canvas></div>
+      <button id="shareInviteBtn" style="margin-top:4px">Share Invite</button>
+      <button class="secondary" id="copyCode">Copy Code</button>
+    </div>`;
+  renderInviteQR($('#qrCanvas'), inviteUrl).catch(e => console.error('QR render failed:', e));
+  $('#shareInviteBtn').onclick = async () => {
+    const result = await shareInvite(night.join_code, night.title);
+    if(result === 'shared') toast('Shared');
+  };
+  $('#copyCode').onclick = async () => {
+    try{
+      await navigator.clipboard.writeText(night.join_code);
+      const btn = $('#copyCode');
+      btn.classList.add('copied'); btn.textContent = 'Copied ✓';
+      setTimeout(() => { btn.classList.remove('copied'); btn.textContent = 'Copy Code'; }, 1800);
+      toast('Copied');
+    } catch { toast('Copy failed — code is ' + night.join_code, true); }
+  };
+}
 
 boot().catch(e => overlay('Something broke', e.message));
