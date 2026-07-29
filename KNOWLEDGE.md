@@ -30,7 +30,7 @@ js/
   app.js              state, auth/boot, rendering, sheets, realtime sync
 ```
 
-**Why `app.js` is still one ~1260-line file, deliberately.** Everything in
+**Why `app.js` is still one ~1600-line file, deliberately.** Everything in
 it shares mutable module-level state (`me`, `night`, `members`, `stops`,
 `expenses`, `balances`, `plan`, `draft`, `currentChannel`). Splitting that
 further needs one of:
@@ -188,6 +188,31 @@ public, and the open gap on access control.
   card's own tap-to-edit — attaching a receipt only ever happens in the
   edit sheet, so an empty icon doing nothing itself but forwarding to
   edit is intentional, not a missed handler.
+- **The numeric font (`--font-numeric`, IBM Plex Mono) is reserved for
+  content that's actually a number** — dollar amounts, timestamps, the
+  keypad, uneven-share stepper values, receipt columns. A phrase that
+  merely *contains* a number (a settlement sentence, a status line, a
+  tag) uses the interface font instead, with `font-variant-numeric:
+  tabular-nums` doing the alignment work that used to be the excuse for
+  reaching for the typewriter face. Two exceptions, both deliberate:
+  - **The receipt (`.receipt` and its `r-*` children) stays blanket
+    monospace, labels included.** It's a literal cash-register-receipt
+    pastiche — real printed receipts are monospace end to end, not just
+    their numbers — so this is a bounded stylistic quotation, the same
+    category as the brand wordmark using Playfair Display. Not an
+    inconsistency to fix.
+  - **Two-letter avatar monograms (`.av`, `.who .mini`, and the inline
+    equivalent in the shares panel) stay monospace.** They're an
+    iconographic "ID badge" label, not prose someone reads, so the
+    typewriter face's blocky look is the point, not a violation.
+- **`--violet` is defined in `:root` but not used anywhere in the
+  codebase** (confirmed by grepping the whole project, not assumed).
+  `--line`, used throughout for borders and dividers, already fills the
+  "purple/lavender: dividers, neutral structure" role chromatically —
+  same muted-violet family, just darker — so no new violet accents were
+  introduced just to give the token a job. Worth revisiting only if a
+  future pass has an actual reason to differentiate "secondary control"
+  from "structural divider" as distinct colors.
 
 ## Real bugs found and fixed (context for why code looks the way it does)
 
@@ -275,6 +300,17 @@ public, and the open gap on access control.
   button before an `await` with no `try/catch` — any unexpected throw
   left the button disabled forever with no feedback, indistinguishable
   from a crash. All three now guarantee recovery.
+- **`--dim2` on `--ink3` was still 4.498:1 — the exact near-miss flagged
+  and deliberately left by the mobile-feel-fixes pass above, unresolved
+  until the typography refinement pass finally fixed it** (`#9088A8` →
+  `#948CB0`, re-measured with the same script, now 4.76–5.57:1 on every
+  card background it's used against). Left as a gap for one pass,
+  fixed in the next — not something that silently lingered forever.
+- The Crew card's "Current share" row (`.cc-share-row`) had its label
+  word ("Current share") inheriting the row's monospace font, meant for
+  the dollar value next to it — found while auditing that card's
+  hierarchy by name for the typography pass, the same class of bug as
+  the flag tag and split-summary line in the same pass.
 
 ## Status: visual/UX redesign passes
 
@@ -474,7 +510,18 @@ public, and the open gap on access control.
     failure behaviour — the sheet now stays open through the whole
     attempt rather than closing first and leaving a failure with nowhere
     to report to.
-25. Not yet specified by the person.
+25. ✅ Typography & contrast refinement pass (spec-driven, prompts 0–4's
+    structural decisions preserved, nothing reversed). Full token system
+    added to `styles.css` (four font-role tokens, a nine-step type scale,
+    eight semantic color aliases). Fixed a real WCAG near-miss (`--dim2`
+    at 4.498:1, found and left by an earlier pass — see Real bugs below)
+    and ~10 places where the numeric font was being used for full phrases
+    instead of numbers. Raised Crew card participant name 14→17px (the
+    clearest single gap the spec's own audit found) and The Tab's
+    settlement instruction 15→20px / amount 24→28px, plus smaller bumps
+    across buttons toward the spec's primary-action floor. The receipt
+    block was deliberately left alone — see Architectural decisions.
+26. Not yet specified by the person.
 
 ## Known open gaps (real, not yet fixed)
 
@@ -529,3 +576,16 @@ public, and the open gap on access control.
   adjusted split) was asked about explicitly early on and never
   answered in any of the specs since — still the original, pre-redesign
   behavior, still unconfirmed as intentional.
+- **No live browser or deployed preview was available during the
+  typography/contrast refinement pass.** Verified via `node --check`,
+  a CSS brace-balance check, and a real WCAG contrast-ratio script —
+  not visual judgment — but no actual screenshots or on-device check
+  were produced. Same category as the still-unconfirmed QR-scan gap;
+  worth a real-device pass, especially at 200% browser zoom and with a
+  genuinely long participant name, before calling that pass fully closed.
+- **One dead CSS rule, `.split-summary`** (distinct from the live
+  `.split-summary-row`/`-main`/`-names`), found while auditing typography
+  — superseded when the Add Round sheet was restructured in an earlier
+  pass, never removed. Left in place since it's not a live inconsistency
+  and this wasn't a cleanup pass; safe to delete whenever someone's
+  actually in that part of the file.

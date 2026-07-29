@@ -5,6 +5,109 @@ Dates below are conversation dates, not deploy dates. Entries under
 `last-call-handoff.md` briefing — no specific dates are available for them,
 so none are guessed.
 
+## 2026-07-29 (typography & contrast refinement pass)
+
+### Added
+- Full typography/color token system in `styles.css`: `--font-brand`/
+  `--font-display`/`--font-interface`/`--font-numeric` (aliases over the
+  four typefaces already loaded — nothing new added), a nine-step named
+  type scale (`--text-tag` 11px through `--text-total`/`--text-settlement`
+  36px/28px), and eight semantic text-color aliases (`--text-primary`
+  through `--text-accent`) over the existing palette.
+- Global `:focus-visible` fallback ring — several interactive elements
+  (`.who button`, `.mini-btn`, `.chip`, `.tab-action-btn`, `.fab button`,
+  `.confirm`, `.cancel`, `.link`…) had no explicit focus style before this,
+  relying on browser default.
+- `.sr-only` utility class + a real (visually-hidden) label for the custom
+  tip-percentage input, which previously had only a placeholder as its
+  label — the one gap the form-controls audit found.
+- `title` attributes on four fields that truncate/clamp under CSS
+  (header night name, stop name, each name in The Tab's per-person list,
+  the Edit Split names line) so the full text is reachable even when the
+  layout can't show it all.
+
+### Fixed
+- **`--dim2` measured 4.498:1 against `--ink3`** — under WCAG AA's 4.5:1.
+  Confirmed with the same relative-luminance script as prior contrast
+  passes, not eyeballed. A prior pass (mobile-feel fixes) had already
+  found this exact near-miss and deliberately left it — see the "Real
+  bugs found and fixed" section of KNOWLEDGE.md; this pass finally fixes
+  it — `#9088A8` → `#948CB0`, now 4.76–5.57:1 on every card background
+  it's used against.
+- **Monospace used for full phrases, not numbers**, in ~10 places — the
+  same "competing type styles" complaint this pass exists to address:
+  header status/live text, the Flagged tag, the flag button's own label,
+  section eyebrows (`.section-lbl`, `.settle-eyebrow`), the Edit Split
+  summary line, Crew card settlement text ("Owes $11.54" etc. — still
+  tabular via `font-variant-numeric`, just not in the typewriter face),
+  the Reopen button's caption, and three of the five End Night sheet row
+  values. Genuinely numeric content (dollar amounts, timestamps, the
+  keypad, uneven-share stepper values) stayed on the numeric font.
+- **Crew card's "Current share" row had its label word inheriting the
+  parent's monospace font** — same class of bug, found while auditing
+  that card specifically since the spec called out its hierarchy by name.
+  The value stays numeric; the label ("Current share") doesn't.
+- End Night sheet's row values were blanket-monospace, including the
+  Night title and the Settlement phrase (e.g. "Everyone is settled") —
+  split via a new `.num` modifier so only the genuinely numeric rows
+  (Total, Rounds · stops, People still out) stay on the numeric font.
+
+### Changed
+- **Crew card participant name: 14px → 17px.** The single clearest gap
+  this pass's audit found against the spec's explicit participant-name
+  floor — everything else in the card's hierarchy (settlement result,
+  paid amount, status) was resized relative to this.
+- **The Tab's settlement instruction: 15px → 20px; settlement amount:
+  24px → 28px.** "Joe pays Eric" was barely bigger than the body text
+  around it before this; the amount was bumped further so it still
+  clearly outranks the now much-bigger instruction above it. The settled
+  state ("Everyone is settled") matched to the same weight so a good
+  outcome doesn't read as smaller news than a pending one.
+- Header total bumped (16px → 18px) so it reads as the header's clearly
+  strongest element, per spec, without changing the header's height or
+  structure.
+- Buttons nudged toward the spec's 17–19px primary-action floor: the
+  sheet Confirm button (16→17px), Keep Night Open / End Night (14→16px),
+  the two Tab action buttons (11.5→13px), Add Round / Add Stop on the
+  bottom bar (15→16px / 12→13px).
+- ~60 hardcoded `font-family`/size declarations across header, Crew,
+  The Tab, the bottom bar, End Night sheet, landing/join screens, and
+  form controls replaced with the new tokens — same visual weight in most
+  places, real fixes where noted above.
+- Settlement row on the End Night summary given a distinct accent color
+  (`.lc-row-settle`), per spec's "settlement summary visually distinct"
+  requirement — it's the row the sheet exists to answer.
+
+### Notes
+- **The receipt block (`.receipt` and its `r-*` children) was deliberately
+  left untouched**, including its blanket monospace treatment for labels
+  like "Subtotal"/"NIGHT TOTAL". It's a literal cash-register-receipt
+  pastiche — real printed receipts are monospace end to end — and this is
+  a considered exception to the typography-role rule, not an oversight.
+  Changing it would work against "preserve existing personality."
+- **`--violet` remains defined but unused** — grepped the whole codebase
+  to confirm before deciding. `--line` already fills the spec's "purple/
+  lavender: dividers, neutral structure" role chromatically (it's the
+  same muted-violet family, just darker), so no new violet accents were
+  invented to give the unused token a job — that would be scope beyond a
+  refinement pass for no clear product reason.
+- Found one dead CSS rule, `.split-summary` (not `.split-summary-row`) —
+  superseded by `.split-summary-row`/`-main`/`-names` when the Add Round
+  sheet was restructured in an earlier pass. Left in place; this wasn't a
+  cleanup pass and it's not a live inconsistency (nothing renders it).
+- **No live browser or deployed preview in this session** — verified via
+  `node --check` on every module, a CSS brace-balance check, and the
+  contrast script; no visual-regression screenshots were produced.
+  Recommend a real-device pass against the deployed site, same
+  recommendation as the still-open QR-scan gap.
+- Compiled build regenerated via the same pipeline as prior passes:
+  local imports stripped, modules merged in dependency order (config →
+  utils → brand → qr → settlement → app), the two external CDN imports
+  (`@supabase/supabase-js`, `qrcode`) hoisted to the top of the merged
+  script, zero leftover import/export keywords and zero duplicate
+  top-level declarations asserted before writing the file, then
+  `node --check` on the merged script.
+
 ## 2026-07-29
 
 ### Added

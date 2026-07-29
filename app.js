@@ -376,6 +376,7 @@ function renderHeader(){
   const live = expenses.filter(e => e.status !== 'disputed' && e.status !== 'void');
   const grand = live.reduce((s,e)=> s + totalOf(e), 0);
   $('#htName').textContent = night.title;
+  $('#htName').title = night.title;
   // money() — the exact same cents-precise formatter used for every
   // expense/settlement amount elsewhere — not a second rounding path.
   $('#htTotal').textContent = money(grand);
@@ -414,7 +415,7 @@ function renderTonight(){
     return `<div class="stop">
       <div class="stop-head">
         <div class="stop-idx">${i+1}</div>
-        <div class="stop-name">${s.name ?? 'Stop ' + (i+1)}</div>
+        <div class="stop-name" title="${escapeHtml(s.name ?? 'Stop ' + (i+1))}">${s.name ?? 'Stop ' + (i+1)}</div>
         <div class="stop-time">${clock(s.arrived_at)} · ${money0(sub)}</div>
       </div>
       ${rows.map(v => {
@@ -713,7 +714,7 @@ function renderTab(){
       <div class="tab-summary-total"><span>Night total</span><b>${money(grand)}</b></div>
       <div class="tab-summary-meta">${rounds} round${rounds===1?'':'s'} · ${stops.length} stop${stops.length===1?'':'s'} · ${members.length} people</div>
       ${balances.map(b => `<div class="tab-summary-row">
-          <span class="nm">${nameOf(b.person_id)}</span>
+          <span class="nm" title="${escapeHtml(nameOf(b.person_id))}">${nameOf(b.person_id)}</span>
           <span class="tab-summary-nums"><span>Paid ${money(b.paid_cents)}</span><span>Share ${money(b.owed_cents)}</span></span>
         </div>`).join('') || `<div class="tab-summary-row"><span class="nm">No one on the tab yet.</span></div>`}
     </div>` +
@@ -876,10 +877,10 @@ function confirmLastCall(){
 
   $('#lcSummary').innerHTML = `
     <div class="lc-row"><span>Night</span><b>${escapeHtml(night.title)}</b></div>
-    <div class="lc-row"><span>Total</span><b>${money(grand)}</b></div>
-    <div class="lc-row"><span>Rounds · stops</span><b>${rounds} · ${stops.length}</b></div>
-    <div class="lc-row"><span>People still out</span><b>${stillOut} of ${members.length}</b></div>
-    <div class="lc-row"><span>Settlement</span><b>${summary.summaryLabel}</b></div>`;
+    <div class="lc-row"><span>Total</span><b class="num">${money(grand)}</b></div>
+    <div class="lc-row"><span>Rounds · stops</span><b class="num">${rounds} · ${stops.length}</b></div>
+    <div class="lc-row"><span>People still out</span><b class="num">${stillOut} of ${members.length}</b></div>
+    <div class="lc-row lc-row-settle"><span>Settlement</span><b>${summary.summaryLabel}</b></div>`;
 
   $('#scrim').classList.add('on');
   $('#lastCallSheet').classList.add('on');
@@ -1206,6 +1207,7 @@ function updateSplitSummary(){
   const { headline, names } = splitSummaryText();
   $('#splitSummaryHeadline').textContent = headline;
   $('#splitSummaryNames').textContent = names;
+  $('#splitSummaryNames').title = names;
 }
 
 // Split out so the tip-custom-input's live update (which deliberately
