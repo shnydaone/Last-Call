@@ -700,9 +700,11 @@ function renderTab(){
     // coexist and never contradict Crew's per-person labels, since both
     // now go through the same settlement.js module.
     `<div class="settle-section">
-      ${collect.length
-        ? `<div class="settle-eyebrow">${summary.summaryLabel}</div>${collect.map(settleCard).join('')}`
-        : `<div class="settle-card settled"><div class="settle-instruction">Everyone is settled</div></div>`}
+      ${live.length === 0
+        ? `<div class="settle-card empty"><div class="settle-instruction">No rounds yet</div><div class="settle-empty-sub">Add a round to start the tab</div></div>`
+        : collect.length
+          ? `<div class="settle-eyebrow">${summary.summaryLabel}</div>${collect.map(settleCard).join('')}`
+          : `<div class="settle-card settled"><div class="settle-instruction">Everyone is settled</div></div>`}
     </div>
     <div class="tab-actions">
       <button class="tab-action-btn" id="btnShareSummary">Share Summary</button>
@@ -794,10 +796,49 @@ function renderTab(){
 
   const rp = $('#btnReopen');
   if(rp) rp.onclick = async () => {
-    const { error } = await sb.rpc('reopen_night', { p_night_id: night.id });
-    if(error) return toast(error.message, true);
-    toast('Reopened — back to logging rounds');
-    goTab('tonight');
+    const btn = $('#btnReopen');
+    btn.disabled = true;
+    const prevLabel = btn.innerHTML;
+    btn.textContent = 'Reopening…';
+    try {
+      const { error } = await sb.rpc('reopen_night', { p_night_id: night.id });
+      if(error){
+        btn.disabled = false;
+        btn.innerHTML = prevLabel;
+        return toast(error.message, true);
+      }
+      // Was relying entirely on the realtime-triggered refresh() to pick
+      // this up — same anti-pattern the End Night handler explicitly
+      // avoids (refresh() is debounced 220ms and isn't really awaitable).
+      // Until that refresh landed, isOpen() kept reading the stale
+      // 'closed' status locally, so the Reopen button itself stayed
+      // rendered and tappable — a second tap hit reopen_night() on an
+      // already-reopened night and errored on the "isn't closed" guard,
+      // which read as the whole flow being stuck. Fetching directly here
+      // (same shape as close_night's own handler) makes local state
+      // correct immediately instead of hoping realtime is fast enough.
+      clearTimeout(refreshT);
+      const [n, mem, st, exp, bal] = await Promise.all([
+        sb.from('night').select('*').eq('id', night.id).single(),
+        sb.from('night_member').select('*, person(*)').eq('night_id', night.id),
+        sb.from('stop').select('*').eq('night_id', night.id).order('seq'),
+        sb.from('expense').select('*, allocation(*)').eq('night_id', night.id).order('occurred_at'),
+        sb.from('night_balance').select('*').eq('night_id', night.id),
+      ]);
+      night    = n.data ?? night;
+      members  = (mem.data || members).sort((a,b)=> new Date(a.joined_at) - new Date(b.joined_at));
+      stops    = st.data || stops;
+      expenses = exp.data || expenses;
+      balances = bal.data || balances;
+      await refreshPlan();
+      renderAll();
+      goTab('tonight');
+      toast('Reopened — back to logging rounds');
+    } catch (err) {
+      btn.disabled = false;
+      btn.innerHTML = prevLabel;
+      toast(err?.message || 'Something went wrong reopening the night — try again', true);
+    }
   };
 }
 
@@ -861,6 +902,22 @@ const goTab = n => document.querySelector(`nav button[data-tab="${n}"]`).click()
 
 /* ---------- last call ---------- */
 function confirmLastCall(){
+  // Same double-guard pattern openEdit() already uses on a closed night —
+  // updateNightMenu() shouldn't offer this once the night is closed, but
+  // refusing here too means nothing (a stale menu, a second tab) can
+  // reach close_night() from the client without a clear reason why not.
+  if(!isOpen()) return toast('This night is already closed', true);
+  // #lastCallSheet is static markup, not re-rendered by renderAll() the
+  // way the panes are — so #lcEndBtn carries over whatever state the
+  // LAST use left it in. The success path below never restores
+  // disabled/textContent (only the error path did), so a night that was
+  // closed, reopened, and is being closed again in the same browser
+  // session found this button permanently showing "Ending…" and
+  // disabled — dead on arrival, no way to end it a second time without
+  // a full page reload. Reset explicitly on every open, not just on error.
+  const endBtn = $('#lcEndBtn');
+  endBtn.disabled = false;
+  endBtn.textContent = 'End Night';
   closeAllSheets();
   // Reuses the exact same figures the rest of the dashboard already
   // computes — grand total via totalOf() (same as the header), presence
@@ -959,6 +1016,15 @@ $('#lcEndBtn').onclick = async () => {
     renderAll();
     goTab('tab');
     closeLastCallSheet();
+    // Success previously left the button disabled, showing "Ending…"
+    // permanently — harmless while the sheet stays closed and "End night"
+    // is hidden from the menu (isOpen() is now false), but the moment the
+    // night gets reopened this exact button reappears in the DOM exactly
+    // as it was left: stuck. Restored here as the real fix; confirmLastCall()
+    // also resets it on open as a second line of defense, same reasoning
+    // as the other double-guards in this file.
+    btn.disabled = false;
+    btn.textContent = prevLabel;
     toast('Night ended — tab finalized');
   } catch (err) {
     // Anything unexpected here — a network failure, a malformed response,
@@ -1538,8 +1604,14 @@ $('#htMark').innerHTML = compactMark();
 // confirmLeaveNight() error handling, rather than being silently
 // prevented by hiding the menu item with no explanation.
 function updateNightMenu(){
-  $('#htEndDivider').style.display = isHost() ? 'block' : 'none';
-  $('#htEndNight').style.display   = isHost() ? 'block' : 'none';
+  // Was isHost() only — End night stayed visible after the night was
+  // already closed, which is exactly how someone could re-trigger
+  // close_night() on a closed night (now also guarded server-side,
+  // but this is the actual UI bug: there was never a reason to offer
+  // ending an already-ended night).
+  const canEnd = isHost() && isOpen();
+  $('#htEndDivider').style.display = canEnd ? 'block' : 'none';
+  $('#htEndNight').style.display   = canEnd ? 'block' : 'none';
 }
 function closeNightMenu(returnFocus){
   $('#htMenu').style.display = 'none';

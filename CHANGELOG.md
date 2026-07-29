@@ -5,6 +5,114 @@ Dates below are conversation dates, not deploy dates. Entries under
 `last-call-handoff.md` briefing — no specific dates are available for them,
 so none are guessed.
 
+## 2026-07-29 (close/reopen data-integrity bug hunt)
+
+Started from a single report — "can't fully end a night, it gets stuck" —
+that turned out to be four separate, real bugs stacked on top of each
+other. Each one was confirmed against the live database or a live
+browser reproduction before being called a bug, not inferred from the
+symptom alone.
+
+### Fixed — database
+- **`close_night()` had no guard against being called on an already-closed
+  night.** Re-running it deleted every row in `settlement` (including any
+  `marked_paid` ones) and re-inserted fresh rows defaulting to
+  `status='open'` — silently reverting every "Mark Paid" confirmation.
+  Added a guard raising a clear error instead, mirroring the exact
+  pattern `reopen_night()` already used for the inverse case ("this night
+  isn't closed" → now also "this night is already closed"). Fixed on
+  both overloaded versions of the function found in the database — a
+  legacy 1-arg one (pre-dust-cents, presumably dead but patched anyway)
+  and the 2-arg one the app actually calls.
+- **`reopen_night()` wasn't `SECURITY DEFINER`, unlike `close_night()`.**
+  Its internal `delete from settlement` ran under the caller's own RLS,
+  and `settlement` has no `DELETE` policy for `authenticated` — only
+  `SELECT` and `UPDATE`. So the cleanup silently affected 0 rows, no
+  error, leaving orphaned settlement rows behind on every reopen.
+  Confirmed live: found exactly one such orphan, a `marked_paid` row on
+  a night that was actively open (title "Fanwood Night Out"). Deleted
+  the orphan and made `reopen_night` `SECURITY DEFINER` — its own
+  `host_id` check is already the real authorization, same reasoning as
+  `close_night`.
+- **The big one: `settle_night()` was returning 403 for every real user,
+  on every call, the whole time.** It's deliberately not `SECURITY
+  DEFINER` (read-only, meant to run under the caller's own privileges),
+  but it calls `assert_night_balances()` internally, which had `EXECUTE`
+  granted only to `postgres`/`service_role` — never `authenticated`. So
+  every live settlement preview on an open night hit a permission error
+  that `refreshPlan()` silently swallowed (`console.error`, falls back
+  to `plan=[]`) — which is why the live Tab kept showing "Everyone is
+  settled" regardless of actual balances. It wasn't wrong math; it was a
+  403 being eaten quietly. `close_night()` only ever worked because it
+  *is* `SECURITY DEFINER` and runs as the function owner instead,
+  bypassing the gap entirely — confirmed directly in the API logs
+  (repeated `POST .../rpc/settle_night → 403`, while `close_night` and
+  everything else on the same session returned 200/204). Fixed by
+  granting `EXECUTE` on `assert_night_balances(uuid)` to
+  `authenticated, anon` — the exact same failure class already written
+  up below for `is_night_member()`, just a different function this time.
+  Verified afterward on a genuine two-person, unbalanced night ($27.50
+  owed) — the live preview now computes and displays it correctly while
+  the night is still open.
+- While auditing every function for the same missing-grant pattern,
+  found two more with the identical gap but confirmed neither is a live
+  bug: `assert_allocation_integrity` only runs as an `allocation` table
+  trigger (doesn't need a direct grant, same as `handle_new_user` on
+  `auth.users`), and `assert_host_permanent` isn't called by anything at
+  all anymore — genuinely dead code, not wired to a trigger or another
+  function. Neither touched.
+
+### Fixed — client
+- `updateNightMenu()` only checked `isHost()`, never `isOpen()` — "End
+  night" stayed offered in the overflow menu after a night was already
+  ended, which is the actual UI path that let the double-close above
+  happen in the first place. Added the `isOpen()` check, plus a
+  defense-in-depth guard inside `confirmLastCall()` itself.
+- The Reopen button never got the button-disable/try-catch treatment
+  the End Night, Mark Paid, and Add Stop handlers already had, and it
+  never refetched state afterward — it just fired the RPC and hoped the
+  debounced realtime refresh caught up eventually. Rewritten to match
+  `close_night`'s own handler: disabled state, real try/catch, explicit
+  refetch instead of waiting on `refresh()`.
+- **The actual "stuck" bug, finally pinned down:** `#lcEndBtn` lives in
+  static markup (`#lastCallSheet`), not something `renderAll()`
+  recreates — so it carries over whatever state the *last* use left it
+  in. The success path only ever restored the button on the *error*
+  branch; a successful close left it permanently `disabled`, showing
+  "Ending…" forever. Invisible the first time (the menu correctly hides
+  "End night" once closed), but the moment the night gets reopened, this
+  exact button reappears in the DOM exactly as it was left — dead on
+  arrival, no way to end the night a second time in the same browser
+  session without a full page reload. This is almost certainly what
+  "reopening totally screwed it up" actually was. Fixed in both places:
+  the close handler now restores the button on success too (the real
+  fix), and `confirmLastCall()` resets it defensively on every open
+  (same double-guard pattern as the other fixes above).
+- The Tab's empty state: a brand-new night with zero rounds showed the
+  identical "Everyone is settled" headline as a night that actually
+  settled up after real activity — a much stronger claim than "nothing
+  logged yet." Added a genuine empty state ("No rounds yet — add a round
+  to start the tab", muted, not the celebratory teal) for when
+  `live.length === 0`, reserving "Everyone is settled" for when
+  transfers actually happened and netted to zero.
+
+### Notes
+- Every fix in this entry was confirmed against live data before being
+  called a bug — live API logs for the 403s, direct SQL queries for the
+  orphaned row and the missing grants, and three separate live browser
+  reproductions (via the actual deployed site) for the client-side
+  fixes, not just static code reading.
+- The database-level fixes (all three migrations) took effect
+  immediately on apply — no deploy needed. The client-side fixes do
+  need the compiled build (or modular source) redeployed to Netlify to
+  take effect; this was the source of some confusion mid-session where
+  a "still happening" report turned out to be the pre-fix code still
+  live.
+- Also clarified, not a bug: opening `last-call-app.html` directly
+  (`file://`) can't hold a Supabase session — reads may appear to work
+  while writes hang or fail. Real testing needs a deployed URL, per the
+  README's existing note; worth restating here since it came up again.
+
 ## 2026-07-29 (typography & contrast refinement pass)
 
 ### Added

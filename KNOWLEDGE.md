@@ -213,6 +213,31 @@ public, and the open gap on access control.
   introduced just to give the token a job. Worth revisiting only if a
   future pass has an actual reason to differentiate "secondary control"
   from "structural divider" as distinct colors.
+- **`close_night()` and `reopen_night()` are meant to be exact mirror
+  images — same authorization model, same guard shape, same
+  `SECURITY DEFINER` status.** They drifted (see Real bugs below: the
+  missing already-closed guard, the missing `SECURITY DEFINER`) because
+  they were written at different times rather than as a matched pair.
+  If either one changes, check the other reflects it. The pattern to
+  keep: the function's own body checks `host_id = auth.uid()` — that
+  check *is* the authorization — and `SECURITY DEFINER` just lets the
+  authorized action actually execute regardless of the caller's own RLS
+  grants, the same principle already documented above for
+  `is_night_member`.
+- **Any function called internally by another function needs its own
+  `EXECUTE` grant checked independently — a function being reachable via
+  the app doesn't mean every function *it* calls is reachable too.**
+  `settle_night` had the right grant; `assert_night_balances`, which it
+  calls, didn't. Found by auditing every function in `public` against
+  `has_function_privilege('authenticated', ..., 'EXECUTE')` in one
+  query rather than checking them one at a time — worth doing that
+  audit again after adding any new internal helper function, since this
+  is now a confirmed repeat failure mode, not a one-off. Two more
+  functions turned up missing the grant during that audit
+  (`assert_allocation_integrity`, `assert_host_permanent`) but neither
+  is a live bug: the first only runs as an `allocation` trigger (trigger
+  execution doesn't need a direct grant, same as `handle_new_user` on
+  `auth.users`), and the second isn't called by anything at all anymore.
 
 ## Real bugs found and fixed (context for why code looks the way it does)
 
@@ -311,6 +336,48 @@ public, and the open gap on access control.
   the dollar value next to it — found while auditing that card's
   hierarchy by name for the typography pass, the same class of bug as
   the flag tag and split-summary line in the same pass.
+- **`close_night()` had no guard against being called on an already-
+  closed night.** Re-running it deleted every `settlement` row —
+  including any `marked_paid` ones — and re-inserted fresh rows
+  defaulting to `status='open'`, silently reverting every "Mark Paid"
+  confirmation. Fixed on both overloaded versions found in the database
+  (a legacy 1-arg one and the 2-arg one the app calls), mirroring the
+  exact guard `reopen_night()` already had for the inverse case.
+- **`reopen_night()` wasn't `SECURITY DEFINER`, unlike `close_night()`.**
+  Its internal `delete from settlement` ran under the caller's own RLS,
+  and there is no `DELETE` policy on `settlement` for `authenticated` —
+  only `SELECT` and `UPDATE`. The delete silently affected 0 rows, no
+  error, leaving orphaned rows behind on every reopen. Found one live
+  (a `marked_paid` row on an actively-open night). Fixed by making
+  `reopen_night` `SECURITY DEFINER` — its own `host_id` check is
+  already the real authorization.
+- **`settle_night()` — the RPC behind every live settlement preview on
+  an open night — was 403ing for every real user, the entire time.**
+  Confirmed directly in the API logs (`POST rpc/settle_night → 403`,
+  repeatedly, while everything else on the same session succeeded).
+  Root cause: it calls `assert_night_balances()` internally, which had
+  `EXECUTE` granted only to `postgres`/`service_role`. Since
+  `settle_night` itself is deliberately not `SECURITY DEFINER` (it's a
+  read-only, caller-privileges function by design), the internal call
+  inherited that gap. `refreshPlan()` swallowed the error silently
+  (`console.error`, falls back to `plan=[]`) — which is the actual
+  explanation for the Tab persistently showing "Everyone is settled"
+  regardless of real balances. Same failure class as the
+  `is_night_member` bug above, just discovered on a different function.
+  Fixed by granting `EXECUTE` on `assert_night_balances(uuid)` to
+  `authenticated, anon`.
+- **The "Ending…"-forever bug.** `#lcEndBtn` lives in static markup
+  (`#lastCallSheet`), never recreated by `renderAll()` the way the tab
+  panes are — so it carries over whatever state the *previous* use left
+  it in. The close handler's success path only ever restored the button
+  on the *error* branch, so a successful close left it permanently
+  `disabled`, showing "Ending…". Invisible the first time (the overflow
+  menu correctly hides "End night" once closed), but the moment the
+  night is reopened, this exact button reappears in the DOM exactly as
+  it was left — un-clickable, no way to end the night a second time in
+  the same browser session without a full reload. Fixed by restoring
+  the button on the success path too, plus a defensive reset in
+  `confirmLastCall()` on every open.
 
 ## Status: visual/UX redesign passes
 
@@ -568,6 +635,12 @@ public, and the open gap on access control.
   `authenticated`. It surfaces as a console error with a graceful empty
   fallback. Worth knowing because it looks alarming when testing the
   compiled single file over `file://`, which can never hold a session.
+  **Correction to this entry:** at the time this was written,
+  *authenticated* callers were also 403ing, for an unrelated reason —
+  `assert_night_balances()`, called internally, was missing its
+  `EXECUTE` grant. That was a real bug, now fixed (see Real bugs above).
+  This entry originally conflated the two; the unauthenticated-caller
+  403 above is still correct and expected.
 - **Tip UI has now reversed twice** (total-first/opt-in → always-visible
   presets) across two passes, both times per explicit instruction, not
   drift. Worth confirming this is the settled direction before it

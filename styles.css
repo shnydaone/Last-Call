@@ -368,6 +368,13 @@ main::-webkit-scrollbar{width:0}
 @keyframes stamp{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 .settle-card:last-child{margin-bottom:0}
 .settle-card.settled{text-align:center;padding:20px 14px}
+/* "No rounds yet" was reusing .settled's card, which colors the
+   instruction teal — the same visual claim as "everyone paid up." A
+   night with zero activity isn't a positive outcome, it's just empty;
+   muted color instead, plus a real sub-line instead of nothing. */
+.settle-card.empty{text-align:center;padding:20px 14px}
+.settle-card.empty .settle-instruction{color:var(--text-muted)}
+.settle-empty-sub{font-family:var(--font-interface);font-size:var(--text-tag);color:var(--text-muted);margin-top:5px}
 /* "Joe pays Eric" is the actionable headline per this pass's spec — was
    15px, barely bigger than body text around it, well under the spec's
    22–30px settlement range. Interface font, not display: it's a full
