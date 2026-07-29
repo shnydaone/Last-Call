@@ -21,29 +21,25 @@
 <body>
 <div class="phone">
   <header id="siteHeader">
-    <div class="hdr-expanded" id="hdrExpanded">
-      <div class="eyebrow">
-        <span class="eyebrow-left">
-          <span id="hdrTitle">—</span>
-          <button class="info-btn" id="btnInfo" aria-label="How this app works" title="How this app works">i</button>
-        </span>
-        <span class="live offline" id="liveTag"><span class="dot"></span>Connecting…</span>
-      </div>
-      <div id="hdrBrand"></div>
-      <div class="hdr-context" id="hdrContext" style="display:none"></div>
-      <div class="totals">
-        <div class="tot-block"><div class="tot-lbl">Night total</div><div class="tot-big" id="hdrTotal">$0.00</div></div>
-        <div class="tot-block"><div class="tot-lbl">Your share</div><div class="tot-sub" id="hdrYou">$0.00</div></div>
-        <div class="tot-block"><div class="tot-lbl">Still out</div><div class="tot-sub" id="hdrOut">0 of 0</div></div>
-      </div>
+    <span class="ht-mark" aria-hidden="true" id="htMark"></span>
+    <div class="ht-name-block">
+      <span class="ht-name" id="htName">—</span>
+      <span class="ht-status" id="htStatus"></span>
     </div>
-    <div class="hdr-compact-row" id="hdrCompactRow" aria-hidden="true">
-      <span class="hdr-compact-mark" id="hdrCompactMark"></span>
-      <span class="hdr-compact-title" id="hdrCompactTitle"></span>
-      <span class="hdr-compact-total" id="hdrCompactTotal">$0.00</span>
-      <span class="hdr-compact-live" id="hdrCompactLive"><span class="dot"></span>Live</span>
-    </div>
+    <span class="ht-total" id="htTotal">$0.00</span>
+    <span class="ht-live" id="htLive"><span class="dot"></span>Live</span>
+    <button class="ht-menu-btn" id="htMenuBtn" aria-haspopup="true" aria-expanded="false" aria-label="Night options">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+        <circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/>
+      </svg>
+    </button>
   </header>
+  <div class="ht-menu" id="htMenu" role="menu" aria-label="Night options" style="display:none">
+    <button class="ht-menu-item" id="htGuide" role="menuitem">How this works</button>
+    <button class="ht-menu-item" id="htSwitchNight" role="menuitem">Switch night</button>
+    <button class="ht-menu-item danger" id="htLeaveNight" role="menuitem" style="display:none">Leave this night entirely</button>
+    <button class="ht-menu-item danger" id="htCloseNight" role="menuitem" style="display:none">Close the night</button>
+  </div>
 
   <nav role="tablist">
     <button role="tab" id="tab-tonight" aria-selected="true" aria-controls="pane-tonight" data-tab="tonight">Tonight</button>

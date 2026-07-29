@@ -1,6 +1,6 @@
 import { sb, DUST_CENTS, PLAYFUL_SUMMARIES } from './config.js';
 import { $, money, money0, clock, initials, groupCode, shareInvite, colorFor, escapeHtml } from './utils.js';
-import { brandBlock, headerBrand, compactMark } from './brand.js';
+import { brandBlock, compactMark } from './brand.js';
 import { renderInviteQR } from './qr.js';
 
 
@@ -335,10 +335,10 @@ function subscribe(nightId){
     .on('postgres_changes', { event:'*', schema:'public', table:'night',        filter:`id=eq.${nightId}` }, refresh)
     .on('postgres_changes', { event:'*', schema:'public', table:'stop',         filter:`night_id=eq.${nightId}` }, refresh)
     .subscribe(status => {
-      const t = $('#liveTag');
-      if(status === 'SUBSCRIBED'){
-        t.className = 'live' + (isOpen() ? '' : ' closed');
-        t.innerHTML = `<span class="dot"></span>${isOpen() ? 'Live' : 'Closed'}`;
+      if(status === 'SUBSCRIBED' && night){
+        const t = $('#htLive');
+        t.className = 'ht-live' + (isOpen() ? '' : ' closed');
+        t.innerHTML = `<span class="dot"></span>${isOpen() ? 'Live' : 'Ended'}`;
       }
     });
 }
@@ -376,40 +376,23 @@ function renderHeader(){
   const now = new Date();
   const live = expenses.filter(e => e.status !== 'disputed' && e.status !== 'void');
   const grand = live.reduce((s,e)=> s + totalOf(e), 0);
-  const mine = balances.find(b => b.person_id === me.id);
-  const activeCount = members.filter(m => presentAt(m, now)).length;
-  $('#hdrTitle').textContent = night.title;
+  $('#htName').textContent = night.title;
   // money() — the exact same cents-precise formatter used for every
-  // expense/settlement amount elsewhere — not the separate money0()
-  // rounder. The header must never disagree with the numbers below it.
-  $('#hdrTotal').textContent = money(grand);
-  $('#hdrYou').textContent   = money(mine?.owed_cents ?? 0);
-  $('#hdrOut').textContent   = `${activeCount} of ${members.length}`;
+  // expense/settlement amount elsewhere — not a second rounding path.
+  $('#htTotal').textContent = money(grand);
+
+  const activeCount = members.filter(m => presentAt(m, now)).length;
+  $('#htStatus').textContent = !isOpen() ? 'Night ended'
+    : activeCount === 0 ? 'Everyone left'
+    : `${activeCount} out`;
+
+  const liveEl = $('#htLive');
+  liveEl.className = 'ht-live' + (isOpen() ? '' : ' closed');
+  liveEl.innerHTML = `<span class="dot"></span>${isOpen() ? 'Live' : 'Ended'}`;
+  liveEl.setAttribute('aria-label', isOpen() ? 'Night is live' : 'Night has ended');
+
   updateFabVisibility();
-
-  // Compact row — same grand/isOpen(), no second source of truth. Text
-  // content only; visibility is driven purely by scroll state (see the
-  // header-state logic near boot(), below).
-  $('#hdrCompactTotal').textContent = money(grand);
-  const compactLive = $('#hdrCompactLive');
-  compactLive.className = 'hdr-compact-live' + (isOpen() ? '' : ' closed');
-  compactLive.innerHTML = `<span class="dot"></span>${isOpen() ? 'Live' : 'Closed'}`;
-  updateCompactTitle();
-
-  // Optional one-line orientation ("STOP 2 · 3 ROUNDS") — only shown once
-  // a stop genuinely exists, using data already fetched for the Tonight
-  // tab (no separate query). Never a placeholder: hidden entirely if
-  // there's nothing to say yet.
-  const hc = $('#hdrContext');
-  if(stops.length){
-    const latest = stops[stops.length - 1];
-    const roundsHere = expenses.filter(e =>
-      e.stop_id === latest.id && e.kind === 'round' && e.status !== 'disputed').length;
-    hc.textContent = `Stop ${stops.length} · ${roundsHere} round${roundsHere===1?'':'s'}`;
-    hc.style.display = 'block';
-  } else {
-    hc.style.display = 'none';
-  }
+  updateNightMenu();
 
   const lcFab = $('#btnLastCallFab');
   if(lcFab){
@@ -538,13 +521,11 @@ function renderCrew(){
   const t0 = members.length ? new Date(members[0].joined_at) : now;
   const span = Math.max(now - t0, 1);
 
-  const canLeave = !isHost() || !isOpen();
-
   $('#pane-crew').innerHTML =
     `<details class="crew-intro" id="crewIntro" ${crewIntroOpen ? 'open' : ''}>
       <summary class="crew-intro-summary">
         <span class="crew-intro-head">Only pay for what you were there for</span>
-        <span class="crew-intro-hint">Join code, share &amp; exit</span>
+        <span class="crew-intro-hint">Join code &amp; share</span>
       </summary>
       <div class="crew-intro-body">
         <p style="margin:0">People only split expenses logged while they're out.<br>Tap someone out when they leave.</p>
@@ -554,12 +535,6 @@ function renderCrew(){
             <button class="crew-btn primary" id="btnShareInvite">Share Invite</button>
             <button class="crew-btn ghost" id="btnCopyCode">Copy Code</button>
           </div>` : ''}
-        <div class="crew-host-actions">
-          <button class="crew-link" id="btnSwitchNight">Not this night? Switch</button>
-          ${canLeave
-            ? `<button class="crew-link danger" id="btnLeaveNight">Leave this night entirely</button>`
-            : `<button class="crew-link danger" id="btnCloseNight">Close the night</button>`}
-        </div>
       </div>
     </details>` +
     `<div class="section-lbl">Who was out</div>` +
@@ -646,16 +621,6 @@ function renderCrew(){
       toast('Copied');
     } catch { toast('Copy failed — code is ' + night.join_code, true); }
   };
-
-  const sw = $('#btnSwitchNight');
-  if(sw) sw.onclick = confirmSwitchNight;
-
-  const lv = $('#btnLeaveNight');
-  if(lv) lv.onclick = confirmLeaveNight;
-
-  // Same Last Call confirmation sheet as the fab — not a second close flow.
-  const cn = $('#btnCloseNight');
-  if(cn) cn.onclick = () => { if(isHost()) confirmLastCall(); };
 
   const ci = $('#crewIntro');
   ci.ontoggle = () => { crewIntroOpen = ci.open; };
@@ -866,11 +831,7 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   currentTab = b.dataset.tab;
   updateFabVisibility();
   $('main').scrollTop = 0;
-  // scrollTop = 0 is a no-op (fires no 'scroll' event) if already at 0 —
-  // switching tabs must always land on the expanded state regardless,
-  // so this is set directly rather than relying on the scroll listener.
-  setHeaderCompact(false);
-  updateCompactTitle();
+  closeNightMenu();
 });
 const goTab = n => document.querySelector(`nav button[data-tab="${n}"]`).click();
 
@@ -1446,52 +1407,37 @@ function showGuide(){
     <button id="guideClose" style="margin-top:6px">Got it</button>`;
   $('#guideClose').onclick = hideOverlay;
 }
-$('#btnInfo').onclick = showGuide;
 
-$('#hdrBrand').innerHTML = headerBrand();
-$('#hdrCompactMark').innerHTML = compactMark();
+$('#htMark').innerHTML = compactMark();
 
-function setHeaderCompact(isCompact){
-  $('#siteHeader').classList.toggle('compact', isCompact);
-  $('#hdrExpanded').setAttribute('aria-hidden', String(isCompact));
-  $('#hdrCompactRow').setAttribute('aria-hidden', String(!isCompact));
+// Overflow menu — the shared integration point for this and future
+// prompts. Populated only with actions that already had real, working
+// handlers elsewhere (Crew's former intro-card buttons, the old info
+// guide button) — no empty/disabled placeholders for Join Code or
+// Share, which are explicitly deferred to a later prompt.
+function updateNightMenu(){
+  const canLeave = !isHost() || !isOpen();
+  $('#htLeaveNight').style.display = canLeave ? 'block' : 'none';
+  $('#htCloseNight').style.display = canLeave ? 'none' : 'block';
 }
-
-// Tab-aware compact title — same live data as the expanded header,
-// never a placeholder. No logo mark on The Tab: the receipt already
-// carries the LAST CALL branding, so repeating it here is exactly the
-// duplication this pass exists to remove.
-function updateCompactTitle(){
-  const mark = $('#hdrCompactMark'), title = $('#hdrCompactTitle');
-  if(currentTab === 'tab'){
-    mark.style.display = 'none';
-    title.textContent = 'The Tab';
-  } else if(currentTab === 'crew'){
-    mark.style.display = 'flex';
-    const stillOut = $('#hdrOut').textContent.split(' ')[0] || '0';
-    title.textContent = `${stillOut} Still Out`;
-  } else {
-    mark.style.display = 'flex';
-    title.textContent = $('#hdrContext').style.display !== 'none'
-      ? $('#hdrContext').textContent : (night?.title ?? 'Tonight');
+function closeNightMenu(){
+  $('#htMenu').style.display = 'none';
+  $('#htMenuBtn').setAttribute('aria-expanded', 'false');
+}
+$('#htMenuBtn').onclick = () => {
+  const open = $('#htMenu').style.display === 'block';
+  $('#htMenu').style.display = open ? 'none' : 'block';
+  $('#htMenuBtn').setAttribute('aria-expanded', String(!open));
+};
+document.addEventListener('click', e => {
+  if($('#htMenu').style.display === 'block' &&
+     !$('#htMenu').contains(e.target) && !$('#htMenuBtn').contains(e.target)){
+    closeNightMenu();
   }
-}
-
-// Two-state scroll behavior — expanded while at/near the top, compact
-// once scrolled in. One listener, one shared state, hysteresis so the
-// threshold doesn't flicker. Only main scrolls (single shared container
-// across all three tabs), so this one listener covers every tab.
-{
-  const mainEl = $('main');
-  let compact = false;
-  mainEl.addEventListener('scroll', () => {
-    const y = mainEl.scrollTop;
-    if(!compact && y > 80){ compact = true; setHeaderCompact(true); }
-    // Restore only near the actual top, not on any small upward scroll —
-    // per spec, this is deliberately not "scroll up a little and it pops
-    // back open."
-    else if(compact && y <= 10){ compact = false; setHeaderCompact(false); }
-  }, { passive: true });
-}
+});
+$('#htGuide').onclick = () => { closeNightMenu(); showGuide(); };
+$('#htSwitchNight').onclick = () => { closeNightMenu(); confirmSwitchNight(); };
+$('#htLeaveNight').onclick  = () => { closeNightMenu(); confirmLeaveNight(); };
+$('#htCloseNight').onclick  = () => { closeNightMenu(); if(isHost()) confirmLastCall(); };
 
 boot().catch(e => overlay('Something broke', e.message));

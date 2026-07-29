@@ -39,53 +39,51 @@ body{background:#120D1C;font-family:'Archivo',system-ui,sans-serif;color:var(--p
   header{padding-top:calc(20px + env(safe-area-inset-top))}
 }
 
-header{border-bottom:1px solid var(--line);
-  background:linear-gradient(180deg, rgba(232,163,61,.07), transparent);flex-shrink:0}
-.hdr-expanded{padding:17px 20px 12px;max-height:400px;opacity:1;overflow:hidden;
-  transition:max-height .2s ease-out,opacity .15s ease-out}
-header.compact .hdr-expanded{max-height:0;opacity:0;padding-top:0;padding-bottom:0}
-.eyebrow{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;
-  text-transform:uppercase;color:var(--dim2);display:flex;justify-content:space-between;align-items:center}
-.eyebrow-left{display:flex;align-items:center;gap:8px;min-width:0}
-.eyebrow-left #hdrTitle{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.info-btn{flex-shrink:0;width:44px;height:44px;margin:-13px -13px -13px -8px;padding:0;
-  border-radius:50%;border:none;background:none;color:var(--dim2);
-  font-family:'Georgia',serif;font-style:italic;font-size:13px;font-weight:700;
-  cursor:pointer;display:flex;align-items:center;justify-content:center;
-  text-transform:none;letter-spacing:0;transition:color .15s}
-.info-btn:hover{color:var(--amber-hot)}
-.info-btn:focus-visible{outline:2px solid var(--amber-hot);outline-offset:1px}
-.info-btn:active{color:var(--amber)}
-.live{color:var(--magenta);display:flex;align-items:center;gap:5px;flex-shrink:0}
-.live.closed{color:var(--dim2)}
-.live.offline{color:var(--dim2)}
-.dot{width:5px;height:5px;border-radius:50%;background:currentColor;animation:pulse 2.4s ease-in-out infinite}
-.live.closed .dot{animation:none}
+/* Permanent compact header — one state, always. No expand/collapse, no
+   scroll listener, no height change. Product decision: removes the
+   previous two-state system and the full wordmark from the active-night
+   screens entirely; the wordmark still lives on the landing/join
+   screens, just not here. */
+header{display:flex;align-items:center;gap:9px;flex-shrink:0;
+  min-height:56px;padding:calc(9px + env(safe-area-inset-top)) 14px 9px;
+  border-bottom:1px solid var(--line);background:var(--ink)}
+.ht-mark{flex-shrink:0;width:26px;height:26px;display:flex}
+.ht-mark svg{width:100%;height:100%}
+.ht-name-block{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:1px}
+.ht-name{font-family:'Archivo',sans-serif;font-weight:600;font-size:14px;color:var(--paper);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ht-status{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);
+  letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ht-total{flex-shrink:0;font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:700;
+  color:var(--amber);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ht-live{flex-shrink:0;display:flex;align-items:center;gap:4px;font-family:'IBM Plex Mono',monospace;
+  font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--magenta)}
+.ht-live.closed{color:var(--dim2)}
+.ht-live .dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+@media (prefers-reduced-motion:no-preference){
+  .ht-live:not(.closed) .dot{animation:pulse 2.4s ease-in-out infinite}
+}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-/* Persistent header brand — real logo mark + wordmark, no tagline (that
-   stays exclusive to the landing overlay and the info guide, so it isn't
-   diluted by appearing on every screen). Sized down from the landing
-   version via .lc-mark-sm; the wordmark is still the page's one <h1>. */
-.hdr-brand{display:flex;align-items:center;gap:13px;margin:9px 0 8px}
-.lc-mark-sm{width:26px;height:26px;flex-shrink:0}
-.hdr-brand-word{font-family:'Playfair Display',serif;font-weight:900;font-size:25px;
-  letter-spacing:.01em;line-height:1;text-transform:uppercase;color:var(--paper)}
-.totals{display:flex;align-items:baseline}
-.tot-block{position:relative;padding:0 16px}
-.tot-block:first-child{padding-left:0}
-.tot-block+.tot-block::before{content:'';position:absolute;left:0;top:24%;bottom:24%;
-  width:1px;background:var(--line);opacity:.6}
-.tot-big{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;color:var(--amber);
-  font-variant-numeric:tabular-nums;white-space:nowrap}
-.tot-lbl{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim2)}
-.tot-sub{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--dim);
-  font-variant-numeric:tabular-nums;white-space:nowrap}
-.hdr-context{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.06em;
-  text-transform:uppercase;color:var(--dim2);margin:-6px 0 10px}
-@media (max-width:350px){
-  .tot-block+.tot-block::before{display:none}
-  .tot-block{padding:0 10px}
-  .tot-block:first-child{padding-left:0}
+.ht-menu-btn{flex-shrink:0;width:44px;height:44px;margin:-9px -9px -9px -2px;padding:0;
+  background:none;border:none;color:var(--dim2);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;border-radius:50%;transition:color .15s}
+.ht-menu-btn:hover,.ht-menu-btn[aria-expanded="true"]{color:var(--paper)}
+.ht-menu-btn:focus-visible{outline:2px solid var(--amber-hot);outline-offset:1px}
+
+/* Overflow menu — shared integration point. Populated here only with
+   already-working actions (see js/app.js); future prompts add to this
+   same menu rather than creating a second one. */
+.ht-menu{position:absolute;top:calc(56px + env(safe-area-inset-top) + 4px);right:14px;z-index:60;
+  min-width:210px;background:var(--ink2);border:1px solid var(--line);border-radius:var(--r-md);
+  padding:6px;box-shadow:0 16px 40px -10px rgba(0,0,0,.65)}
+.ht-menu-item{display:block;width:100%;text-align:left;background:none;border:none;cursor:pointer;
+  min-height:44px;padding:11px 14px;border-radius:var(--r-sm);
+  font-family:'Archivo',sans-serif;font-size:14px;font-weight:500;color:var(--paper)}
+.ht-menu-item:hover{background:var(--ink3)}
+.ht-menu-item.danger{color:var(--magenta)}
+@media (max-width:340px){
+  .ht-status{display:none}
+  header{gap:6px;padding-left:10px;padding-right:10px}
 }
 
 nav{display:flex;border-bottom:1px solid var(--line);flex-shrink:0;background:var(--ink)}
@@ -100,29 +98,6 @@ nav button[aria-selected="true"]::after{background:var(--amber)}
 
 main{flex:1;overflow-y:auto;overscroll-behavior:contain;position:relative}
 main::-webkit-scrollbar{width:0}
-/* Compact header row — the header's second state, toggled by adding/
-   removing .compact on the outer <header> (see the scroll-state logic
-   in app.js). Max-height + opacity transition, not display:none, so the
-   180-220ms fade actually animates rather than cutting instantly; this
-   is a one-time transition on state change, not a continuous per-scroll
-   animation. Never coexists with .hdr-expanded — exactly one is visible. */
-.hdr-compact-row{display:flex;align-items:center;gap:8px;padding:0 20px;
-  max-height:0;opacity:0;overflow:hidden;
-  transition:max-height .2s ease-out,opacity .15s ease-out .05s}
-header.compact .hdr-compact-row{max-height:56px;opacity:1;padding-top:14px;padding-bottom:14px}
-.hdr-compact-mark{flex-shrink:0;width:18px;height:18px;display:flex}
-.hdr-compact-mark svg{width:100%;height:100%}
-.hdr-compact-title{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.05em;
-  text-transform:uppercase;color:var(--dim);flex-shrink:1;min-width:0;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hdr-compact-total{margin-left:auto;flex-shrink:0;font-family:'IBM Plex Mono',monospace;font-size:13px;
-  font-weight:600;color:var(--amber);font-variant-numeric:tabular-nums;white-space:nowrap}
-.hdr-compact-live{flex-shrink:0;display:flex;align-items:center;gap:4px;font-family:'IBM Plex Mono',monospace;
-  font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--magenta)}
-.hdr-compact-live.closed{color:var(--dim2)}
-.hdr-compact-live .dot{width:5px;height:5px;border-radius:50%;background:currentColor;
-  animation:pulse 2.4s ease-in-out infinite}
-.hdr-compact-live.closed .dot{animation:none}
 .pane{display:none;padding:18px 20px 120px}
 .pane.on{display:block}
 
