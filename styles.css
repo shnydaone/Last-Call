@@ -259,42 +259,61 @@ main::-webkit-scrollbar{width:0}
 .r-line{display:flex;justify-content:space-between;gap:10px;padding:2px 0}
 .r-muted{opacity:.65}
 .r-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-/* Who-pays-who — one payment per block: names+verb, amount, status, then
-   at most one action button. Stacked rather than the old single-line
-   arrow layout so long names truncate instead of squeezing the amount. */
-.r-pay{padding:9px 0;border-bottom:1px dotted rgba(26,21,32,.3);animation:stamp .4s ease both}
-@keyframes stamp{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
-.r-pay-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
-.r-pay-line{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px}
-.r-pay-amt{font-weight:700;font-size:13px;flex-shrink:0}
-.r-pay-status{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;opacity:.65;margin-top:2px}
-.r-big{font-family:'Anton',sans-serif;font-size:15px;letter-spacing:.03em}
 .r-stat{display:flex;justify-content:space-between;gap:10px;font-size:10.5px;opacity:.75;padding:2px 0}
 .r-stat span:last-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:1}
 .r-dust{font-size:10.5px;opacity:.7;font-style:italic;padding:6px 0 2px}
 .venmo{width:100%;margin-top:8px;background:#1A1520;color:var(--paper);border:none;
   border-radius:var(--r-sm);padding:9px;min-height:var(--tap-min);display:flex;align-items:center;justify-content:center;
   cursor:pointer;font-size:13px;font-weight:600;letter-spacing:.02em;text-align:center;text-decoration:none}
-.settled{opacity:.65}
 
-/* Action row beneath the receipt card, plus the Details panel it can
-   reveal. Kept entirely outside .receipt so the signature receipt stays
-   uncluttered — "reveal without cluttering the main receipt" means out,
-   not just collapsed-in-place. */
-.tab-actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+/* Settlement instruction — the first thing on The Tab, per this prompt.
+   Deliberately NOT styled like the receipt below (dark app UI, not cream
+   paper) — this is the actionable thing, the receipt is the transparent
+   record. One card whether there's one transfer or several; the eyebrow
+   above them uses the canonical night-level summary wording. */
+.settle-section{margin-bottom:14px}
+.settle-eyebrow{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--dim2);margin-bottom:8px}
+.settle-card{background:var(--ink2);border:1px solid var(--ink3);border-radius:var(--r-md);
+  padding:14px;margin-bottom:8px;animation:stamp .3s ease both}
+@keyframes stamp{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.settle-card:last-child{margin-bottom:0}
+.settle-card.settled{text-align:center;padding:20px 14px}
+.settle-instruction{font-size:15px;font-weight:600;color:var(--paper)}
+.settle-amount{font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:700;color:var(--amber);
+  font-variant-numeric:tabular-nums;margin-top:3px}
+.settle-card.settled .settle-instruction{font-size:16px;color:var(--teal)}
+.settle-status{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--dim2);margin-top:5px}
+.settle-card.paid .settle-status{color:var(--teal)}
+
+/* Compact summary — supporting context, quieter than the settlement
+   card above it (smaller type, no amber emphasis on the total here). */
+.tab-summary{background:var(--ink2);border:1px solid var(--ink3);border-radius:var(--r-md);
+  padding:13px;margin-bottom:10px}
+.tab-summary-total{display:flex;justify-content:space-between;font-size:13px;color:var(--dim)}
+.tab-summary-total b{color:var(--paper);font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+.tab-summary-meta{font-size:10.5px;color:var(--dim2);margin:2px 0 10px}
+.tab-summary-row{display:flex;justify-content:space-between;align-items:center;gap:10px;
+  font-size:12px;padding:7px 0;border-top:1px solid var(--ink3);color:var(--dim)}
+.tab-summary-row:first-of-type{border-top:none}
+.tab-summary-row .nm{font-weight:600;color:var(--paper);min-width:0;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.tab-summary-nums{display:flex;gap:12px;flex-shrink:0;font-family:'IBM Plex Mono',monospace;font-size:11px}
+
+/* Details toggle + collapsible receipt — the old full receipt content,
+   demoted to transparency-on-request rather than the first thing shown. */
+.tab-actions{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
 .tab-action-btn{flex:1 1 0;min-width:90px;border-radius:var(--r-md);min-height:var(--tap-min);
   padding:0 10px;cursor:pointer;font-family:'Anton',sans-serif;font-size:11.5px;letter-spacing:.03em;
   text-transform:uppercase;background:var(--ink2);color:var(--paper);border:1px solid var(--line)}
 .tab-action-btn.primary{background:var(--amber);color:var(--ink);border:none}
-.tab-details{background:var(--ink2);border:1px solid var(--ink3);border-radius:var(--r-md);
-  padding:4px 13px;margin-top:10px;display:none}
+.tab-calc-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;
+  background:none;border:1px solid var(--line);border-radius:var(--r-md);min-height:var(--tap-min);
+  padding:0 14px;cursor:pointer;color:var(--dim);font-family:'Archivo',sans-serif;font-size:13px;font-weight:600}
+.tab-calc-toggle svg{transition:transform .15s ease-out}
+.tab-calc-toggle[aria-expanded="true"] svg{transform:rotate(90deg)}
+.tab-details{margin-top:10px;display:none}
 .tab-details.on{display:block}
-.tab-details-row{display:flex;justify-content:space-between;align-items:center;gap:10px;
-  font-size:12px;padding:8px 0;border-bottom:1px solid var(--ink3);color:var(--dim)}
-.tab-details-row:last-child{border-bottom:none}
-.tab-details-row .nm{font-weight:600;color:var(--paper);min-width:0;overflow:hidden;
-  text-overflow:ellipsis;white-space:nowrap}
-.tab-details-nums{display:flex;gap:12px;flex-shrink:0;font-family:'IBM Plex Mono',monospace;font-size:11px}
 
 .fab{position:absolute;left:16px;right:16px;bottom:calc(13px + env(safe-area-inset-bottom));
   z-index:20;display:flex;gap:8px;align-items:stretch}
@@ -310,20 +329,16 @@ main::-webkit-scrollbar{width:0}
 /* Secondary — labeled, not icon-only; quieter neutral fill */
 .fab-alt{flex:1;font-size:12px;background:var(--ink2);color:var(--paper);border:1px solid var(--line)}
 .fab-alt .ico{font-size:14px;line-height:1}
-/* Destructive/final — distinct (magenta = the app's existing warning color)
-   but outlined rather than solid-filled, so it reads as deliberate and
-   final without out-competing the solid-fill primary action for attention. */
-.fab-last{flex:1;font-size:12px;background:transparent;color:var(--magenta);
-  border:1.5px solid var(--magenta)}
-.fab-last:disabled{border-color:var(--ink3);color:var(--dim2)}
 
-.scrim{position:absolute;inset:0;background:rgba(6,4,12,.75);backdrop-filter:blur(3px);z-index:30;display:none}
+.scrim{position:absolute;inset:0;background:rgba(6,4,12,.97);backdrop-filter:blur(3px);z-index:30;display:none}
 .scrim.on{display:block;animation:fade .2s both}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--ink2);
   border-top:1px solid var(--line);border-radius:22px 22px 0 0;
-  transform:translateY(102%);transition:transform .3s cubic-bezier(.2,.8,.2,1)}
-.sheet.on{transform:none}
+  transform:translateY(102%);visibility:hidden;
+  transition:transform .3s cubic-bezier(.2,.8,.2,1),visibility 0s linear .3s}
+.sheet.on{transform:none;visibility:visible;
+  transition:transform .3s cubic-bezier(.2,.8,.2,1),visibility 0s linear 0s}
 
 /* Small sheets — Add Stop, Last Call confirmation. Unchanged from before:
    size-to-content, capped at 90% of the phone. */
@@ -546,6 +561,6 @@ main::-webkit-scrollbar{width:0}
 
 .qr-wrap{background:var(--paper);border-radius:var(--r-md);padding:12px;
   display:inline-flex;align-self:center}
-.qr-wrap canvas{display:block;width:150px;height:150px}
+.qr-wrap canvas{display:block;width:220px;height:220px}
 
 @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}

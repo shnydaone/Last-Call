@@ -42,6 +42,8 @@
     <button class="ht-menu-item" id="htSwitchNight" role="menuitem">Switch night</button>
     <div class="ht-menu-divider" role="separator"></div>
     <button class="ht-menu-item danger" id="htLeaveNight" role="menuitem">Leave this night entirely</button>
+    <div class="ht-menu-divider" role="separator" id="htEndDivider" style="display:none"></div>
+    <button class="ht-menu-item danger" id="htEndNight" role="menuitem" style="display:none">End night</button>
   </div>
 
   <nav role="tablist">
@@ -59,7 +61,6 @@
   <div class="fab" id="fab" style="display:none">
     <button class="fab-main" id="btnRound">+ Add Round</button>
     <button class="fab-alt" id="btnStop"><span class="ico" aria-hidden="true">📍</span>Add Stop</button>
-    <button class="fab-last" id="btnLastCallFab">Last Call</button>
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
@@ -182,11 +183,11 @@
     <button class="cancel" id="stopCancel">Cancel</button>
   </div>
 
-  <div class="sheet sheet-compact" id="lastCallSheet">
+  <div class="sheet sheet-compact" id="lastCallSheet" role="dialog" aria-modal="true" aria-labelledby="lcHeading">
     <div class="sheet-handle">
       <div class="grab"></div>
-      <h2>Last Call?</h2>
-      <p class="hint">This closes the night and prepares the final tab.</p>
+      <h2 id="lcHeading">End the night?</h2>
+      <p class="hint">This stops new rounds and stops, and finalizes the current tab. You can reopen it later if you need to add more or re-settle.</p>
     </div>
     <div class="lc-summary" id="lcSummary"></div>
     <button class="keep-btn" id="lcKeepBtn">Keep Night Open</button>

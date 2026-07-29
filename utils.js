@@ -5,7 +5,7 @@
    anywhere without circular-dependency risk.
    ============================================================ */
 export const $  = s => document.querySelector(s);
-export const money  = c => (c/100).toLocaleString('en-US', { style:'currency', currency:'USD' });
+export const money  = c => ((c === 0 ? 0 : c) / 100).toLocaleString('en-US', { style:'currency', currency:'USD' });
 export const money0 = c => '$' + Math.round(c/100).toLocaleString();
 export const clock  = ts => new Date(ts).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
 export const initials = n => (n||'?').slice(0,2).toUpperCase();

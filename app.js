@@ -2,6 +2,7 @@ import { sb, DUST_CENTS, PLAYFUL_SUMMARIES } from './config.js';
 import { $, money, money0, clock, initials, groupCode, shareInvite, colorFor, escapeHtml } from './utils.js';
 import { brandBlock, compactMark } from './brand.js';
 import { renderInviteQR } from './qr.js';
+import { settlementFor, transferInstruction, nightSettlementSummary } from './settlement.js';
 
 
 /* ============================================================
@@ -390,12 +391,7 @@ function renderHeader(){
   liveEl.setAttribute('aria-label', isOpen() ? 'Night is live' : 'Night has ended');
 
   updateFabVisibility();
-
-  const lcFab = $('#btnLastCallFab');
-  if(lcFab){
-    lcFab.disabled = !isHost();
-    lcFab.title = isHost() ? 'Close the night' : `Only ${nameOf(night.host_id)} can close the night`;
-  }
+  updateNightMenu();
 }
 
 function renderTonight(){
@@ -520,12 +516,6 @@ function viewReceipt(url){
 // label: net_cents = paid_cents - owed_cents, so positive means you paid
 // more than your share (money comes back to you), negative means you
 // paid less than your share (you owe the difference).
-function settlementDisplay(netCents){
-  if(netCents === 0) return { text: 'Settled', cls: 'settled' };
-  if(netCents > 0)   return { text: `Gets back ${money(netCents)}`, cls: 'pos' };
-  return { text: `Owes ${money(Math.abs(netCents))}`, cls: 'neg' };
-}
-
 function renderCrew(){
   const now = new Date();
   const t0 = members.length ? new Date(members[0].joined_at) : now;
@@ -547,7 +537,7 @@ function renderCrew(){
       const isMe = m.person_id === me.id;
       const canEdit = isMe || isHost();
       const expanded = expandedMember === m.person_id;
-      const settle = settlementDisplay(b.net_cents);
+      const settle = settlementFor(b.net_cents);
 
       // One concise line in the collapsed card — full arrival/departure
       // detail moves to the expanded view instead of doubling up here.
@@ -563,7 +553,7 @@ function renderCrew(){
       // explanation says that explicitly rather than leaving it implied.
       const dryExplain = 'Excludes them from drink-round expenses only — food and other expenses still include them while present.';
 
-      const accessibleName = `${m.person.display_name}${isMe?' (you)':''}${m.role==='host'?', host':''}, ${attendanceLabel}, ${settle.text}`;
+      const accessibleName = `${m.person.display_name}${isMe?' (you)':''}${m.role==='host'?', host':''}, ${attendanceLabel}, ${settle.label}`;
 
       return `<div class="crew-card" data-member="${m.person_id}" role="button" tabindex="0"
           aria-expanded="${expanded}" aria-label="${escapeHtml(accessibleName)}">
@@ -575,7 +565,7 @@ function renderCrew(){
             <div class="cc-status">${attendanceLabel}</div>
           </div>
           <div class="cc-financial">
-            <div class="cc-settlement ${settle.cls}">${settle.text}</div>
+            <div class="cc-settlement ${settle.cls}">${settle.label}</div>
             <div class="cc-paid">Paid ${money(b.paid_cents)}</div>
           </div>
           <svg class="cc-chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
@@ -672,8 +662,7 @@ function renderTab(){
   const collect = plan.filter(p => !p.is_dust);
   const dust    = plan.filter(p =>  p.is_dust);
   const dustTot = dust.reduce((s,p)=>s+p.amount_cents,0);
-  const naive = expenses.filter(e=>e.status!=='disputed')
-    .reduce((n,e)=> n + e.allocation.filter(a=>a.person_id!==e.payer_id).length, 0);
+  const rounds  = expenses.filter(e => e.kind === 'round' && e.status !== 'disputed').length;
 
   const final = !isOpen();
   const stopsLine = stops.map(s=>s.name).filter(Boolean).join(' → ');
@@ -683,64 +672,84 @@ function renderTab(){
   // encouraging real money against a total that's still moving is how
   // someone overpays a stale preview.
   const showSettle = final && collect.some(p => p.status !== 'marked_paid');
+  // Canonical, not derived independently — the same object Prompt 4's
+  // end-night confirmation should consume too, not recalculate.
+  const summary = nightSettlementSummary(collect);
+
+  const settleCard = (p, i) => {
+    const marked = p.status === 'marked_paid';
+    const canAct = final && p.id;
+    const iAmOwer = p.from_person === me.id;
+    const handle = M(p.to_person)?.person?.venmo_handle;
+    const t = transferInstruction(nameOf(p.from_person), nameOf(p.to_person), p.amount_cents);
+    return `<div class="settle-card ${marked?'paid':''}" style="animation-delay:${i*.06}s">
+      <div class="settle-instruction">${t.instructionLabel}</div>
+      <div class="settle-amount">${t.amountLabel}</div>
+      <div class="settle-status">${marked ? 'Paid' : 'Payment pending'}</div>
+      ${(canAct && !marked) ? (iAmOwer
+        ? `<a class="venmo" target="_blank" rel="noopener"
+             href="https://venmo.com/?txn=pay${handle?'&audience=private&recipients='+encodeURIComponent(handle):''}&amount=${(p.amount_cents/100).toFixed(2)}&note=${encodeURIComponent(night.title)}">Pay in Venmo</a>`
+        : `<button class="venmo" data-pay="${p.id}">Mark Paid</button>`) : ''}
+    </div>`;
+  };
 
   $('#pane-tab').innerHTML =
-    `<div class="receipt">
-      <div class="r-center">
-        <div class="r-title">LAST CALL</div>
-        ${final
-          ? `<div class="r-status final">FINAL TAB</div>
-             <div class="r-status-sub">Night closed${night.closed_at ? ' at ' + clock(night.closed_at) : ''}</div>`
-          : `<div class="r-status running">RUNNING TAB</div>
-             <div class="r-status-sub">Night still open</div>`}
-        <div class="r-muted" style="margin-top:6px">${night.title}</div>
-        ${stopsLine ? `<div class="r-muted r-name" style="max-width:100%;margin:0 auto">${stopsLine}</div>` : ''}
-      </div>
-      ${!final ? `<div class="r-preview-note">These numbers update as people log rounds and leave the night.</div>` : ''}
-      <div class="r-rule"></div>
-      <div class="r-line"><span>Subtotal</span><span>${money(grand-tips)}</span></div>
-      <div class="r-line"><span>Tips</span><span>${money(tips)}</span></div>
-      <div class="r-line"><b>NIGHT TOTAL</b><b>${money(grand)}</b></div>
-      <div class="r-rule"></div>
-      <div class="r-center r-big" id="whoPaysWhoHeading">WHO PAYS WHO</div>
-      <div class="r-center r-muted" style="margin-bottom:8px">${naive} debts → ${collect.length} payment${collect.length===1?'':'s'}</div>
-      ${collect.length ? collect.map((p,i) => {
-        const marked = p.status === 'marked_paid';
-        const canAct = final && p.id;
-        const iAmOwer = p.from_person === me.id;
-        const handle = M(p.to_person)?.person?.venmo_handle;
-        return `<div class="r-pay ${marked?'settled':''}" style="animation-delay:${i*.08}s">
-          <div class="r-pay-top">
-            <span class="r-pay-line"><b>${nameOf(p.from_person)}</b> pays <b>${nameOf(p.to_person)}</b></span>
-            <span class="r-pay-amt">${money(p.amount_cents)}</span>
-          </div>
-          <div class="r-pay-status">${marked ? 'Marked paid' : 'Unpaid'}</div>
-          ${(canAct && !marked) ? (iAmOwer
-            ? `<a class="venmo" target="_blank" rel="noopener"
-                 href="https://venmo.com/?txn=pay${handle?'&audience=private&recipients='+encodeURIComponent(handle):''}&amount=${(p.amount_cents/100).toFixed(2)}&note=${encodeURIComponent(night.title)}">Pay in Venmo</a>`
-            : `<button class="venmo" data-pay="${p.id}">Mark received</button>`) : ''}
-        </div>`;
-      }).join('') : `<div class="r-center" style="padding:10px 0">
-          <div class="r-big">ALL SQUARE</div><div class="r-muted">No payments needed.</div></div>`}
-      ${dustTot ? `<div class="r-dust">Written off under $${(DUST_CENTS/100).toFixed(2)}: ${money(dustTot)}
-        (${dust.map(p=>nameOf(p.from_person)).join(', ')})</div>` : ''}
-      ${flagged.length ? `<div class="r-rule"></div>
-        <div class="r-muted r-center"><span aria-hidden="true">⚑</span> ${flagged.length} flagged &amp; excluded</div>
-        ${flagged.map(e=>`<div class="r-line r-muted"><span class="r-name">${e.note}</span><span>${money(totalOf(e))}</span></div>`).join('')}`:''}
-      ${playfulStatsHtml()}
-      <div class="r-rule"></div>
-      <div class="r-center r-muted">*** THAT'S LAST CALL, FOLKS ***</div>
-    </div>` +
-    `<div class="tab-actions">
+    // Settlement instruction — the first thing on the screen, per this
+    // prompt's whole point. Everyone-settled and pending states never
+    // coexist and never contradict Crew's per-person labels, since both
+    // now go through the same settlement.js module.
+    `<div class="settle-section">
+      ${collect.length
+        ? `<div class="settle-eyebrow">${summary.summaryLabel}</div>${collect.map(settleCard).join('')}`
+        : `<div class="settle-card settled"><div class="settle-instruction">Everyone is settled</div></div>`}
+    </div>
+    <div class="tab-actions">
       <button class="tab-action-btn" id="btnShareSummary">Share Summary</button>
       ${showSettle ? `<button class="tab-action-btn primary" id="btnSettleUp">Settle Up</button>` : ''}
-      <button class="tab-action-btn" id="btnToggleDetails">Details</button>
     </div>` +
-    `<div class="tab-details" id="tabDetails">
-      ${balances.map(b => `<div class="tab-details-row">
+    // Compact summary — supporting context, deliberately smaller and
+    // quieter than the settlement instruction above it.
+    `<div class="tab-summary">
+      <div class="tab-summary-total"><span>Night total</span><b>${money(grand)}</b></div>
+      <div class="tab-summary-meta">${rounds} round${rounds===1?'':'s'} · ${stops.length} stop${stops.length===1?'':'s'} · ${members.length} people</div>
+      ${balances.map(b => `<div class="tab-summary-row">
           <span class="nm">${nameOf(b.person_id)}</span>
-          <span class="tab-details-nums"><span>Paid ${money(b.paid_cents)}</span><span>Share ${money(b.owed_cents)}</span></span>
-        </div>`).join('') || `<div class="tab-details-row"><span class="nm">No one on the tab yet.</span></div>`}
+          <span class="tab-summary-nums"><span>Paid ${money(b.paid_cents)}</span><span>Share ${money(b.owed_cents)}</span></span>
+        </div>`).join('') || `<div class="tab-summary-row"><span class="nm">No one on the tab yet.</span></div>`}
+    </div>` +
+    // Detailed math — transparency, not the primary thing to interpret.
+    // Collapsed by default; this is the old full receipt content,
+    // unchanged in substance, just no longer the first thing you see.
+    `<button class="tab-calc-toggle" id="btnToggleDetails" aria-expanded="false">
+      <span>How this was calculated</span>
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
+    <div class="tab-details" id="tabDetails">
+      <div class="receipt">
+        <div class="r-center">
+          <div class="r-title">LAST CALL</div>
+          ${final
+            ? `<div class="r-status final">FINAL TAB</div>
+               <div class="r-status-sub">Night closed${night.closed_at ? ' at ' + clock(night.closed_at) : ''}</div>`
+            : `<div class="r-status running">RUNNING TAB</div>
+               <div class="r-status-sub">Night still open</div>`}
+          <div class="r-muted" style="margin-top:6px">${night.title}</div>
+          ${stopsLine ? `<div class="r-muted r-name" style="max-width:100%;margin:0 auto">${stopsLine}</div>` : ''}
+        </div>
+        ${!final ? `<div class="r-preview-note">These numbers update as people log rounds and leave the night.</div>` : ''}
+        <div class="r-rule"></div>
+        <div class="r-line"><span>Subtotal</span><span>${money(grand-tips)}</span></div>
+        <div class="r-line"><span>Tips</span><span>${money(tips)}</span></div>
+        <div class="r-line"><b>NIGHT TOTAL</b><b>${money(grand)}</b></div>
+        ${dustTot ? `<div class="r-dust">Written off under $${(DUST_CENTS/100).toFixed(2)}: ${money(dustTot)}
+          (${dust.map(p=>nameOf(p.from_person)).join(', ')})</div>` : ''}
+        ${flagged.length ? `<div class="r-rule"></div>
+          <div class="r-muted r-center"><span aria-hidden="true">⚑</span> ${flagged.length} flagged &amp; excluded</div>
+          ${flagged.map(e=>`<div class="r-line r-muted"><span class="r-name">${e.note}</span><span>${money(totalOf(e))}</span></div>`).join('')}`:''}
+        ${playfulStatsHtml()}
+        <div class="r-rule"></div>
+        <div class="r-center r-muted">*** THAT'S LAST CALL, FOLKS ***</div>
+      </div>
     </div>` +
     (final && isHost()
       ? `<button class="lastcall" id="btnReopen" style="margin-top:14px;background:linear-gradient(135deg,var(--teal),#1d9e7a)">
@@ -749,13 +758,18 @@ function renderTab(){
 
   $('#pane-tab').querySelectorAll('[data-pay]').forEach(b => b.onclick = async () => {
     b.disabled = true;
-    const { error } = await sb.from('settlement')
-      .update({ status: 'marked_paid', marked_paid_at: new Date().toISOString() })
-      .eq('id', b.dataset.pay);
-    if(error){ b.disabled = false; return toast(error.message, true); }
-    await refreshPlan();
-    toast('Marked received — we never move the money');
-    renderTab();
+    try {
+      const { error } = await sb.from('settlement')
+        .update({ status: 'marked_paid', marked_paid_at: new Date().toISOString() })
+        .eq('id', b.dataset.pay);
+      if(error){ b.disabled = false; return toast(error.message, true); }
+      await refreshPlan();
+      toast('Marked paid — we never move the money');
+      renderTab();
+    } catch (err) {
+      b.disabled = false;
+      toast(err?.message || 'Something went wrong — try again', true);
+    }
   });
 
   $('#btnShareSummary').onclick = () => shareTabSummary(grand, collect, final);
@@ -768,11 +782,14 @@ function renderTab(){
       const url = `https://venmo.com/?txn=pay${handle?'&audience=private&recipients='+encodeURIComponent(handle):''}&amount=${(mine.amount_cents/100).toFixed(2)}&note=${encodeURIComponent(night.title)}`;
       window.open(url, '_blank', 'noopener');
     } else {
-      $('#whoPaysWhoHeading')?.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' });
+      $('.settle-section')?.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' });
     }
   };
 
-  $('#btnToggleDetails').onclick = () => $('#tabDetails').classList.toggle('on');
+  $('#btnToggleDetails').onclick = () => {
+    const open = $('#tabDetails').classList.toggle('on');
+    $('#btnToggleDetails').setAttribute('aria-expanded', String(open));
+  };
 
   const rp = $('#btnReopen');
   if(rp) rp.onclick = async () => {
@@ -807,9 +824,12 @@ const prefersReducedMotion = () =>
 async function shareTabSummary(grand, collect, final){
   const lines = [`${night.title} — ${final ? 'final tab' : 'running tab'}: ${money(grand)}`];
   if(collect.length){
-    collect.forEach(p => lines.push(`${nameOf(p.from_person)} pays ${nameOf(p.to_person)}: ${money(p.amount_cents)}`));
+    collect.forEach(p => {
+      const t = transferInstruction(nameOf(p.from_person), nameOf(p.to_person), p.amount_cents);
+      lines.push(`${t.instructionLabel}: ${t.amountLabel}`);
+    });
   } else {
-    lines.push('All square — no payments needed.');
+    lines.push('Everyone is settled.');
   }
   const text = lines.join('\n');
   if(navigator.share){
@@ -840,39 +860,117 @@ const goTab = n => document.querySelector(`nav button[data-tab="${n}"]`).click()
 
 /* ---------- last call ---------- */
 function confirmLastCall(){
+  closeAllSheets();
   // Reuses the exact same figures the rest of the dashboard already
   // computes — grand total via totalOf() (same as the header), presence
   // via presentAt() (same as the header's Active count), and the live
   // settle_night plan (same rows the Tab pane renders) — nothing here is
-  // a separate calculation invented for this sheet.
+  // a separate calculation invented for this sheet. Wording goes through
+  // the same canonical settlement.js module too, not its own copy.
   const now = new Date();
   const live = expenses.filter(e => e.status !== 'disputed' && e.status !== 'void');
   const grand = live.reduce((s,e)=> s + totalOf(e), 0);
+  const rounds = expenses.filter(e => e.kind === 'round' && e.status !== 'disputed').length;
   const stillOut = members.filter(m => presentAt(m, now)).length;
-  const unresolved = plan.filter(p => !p.is_dust).length;
+  const summary = nightSettlementSummary(plan.filter(p => !p.is_dust));
 
   $('#lcSummary').innerHTML = `
-    <div class="lc-row"><span>Current total</span><b>${money(grand)}</b></div>
+    <div class="lc-row"><span>Night</span><b>${escapeHtml(night.title)}</b></div>
+    <div class="lc-row"><span>Total</span><b>${money(grand)}</b></div>
+    <div class="lc-row"><span>Rounds · stops</span><b>${rounds} · ${stops.length}</b></div>
     <div class="lc-row"><span>People still out</span><b>${stillOut} of ${members.length}</b></div>
-    <div class="lc-row"><span>Unresolved balances</span><b>${unresolved}</b></div>`;
+    <div class="lc-row"><span>Settlement</span><b>${summary.summaryLabel}</b></div>`;
 
   $('#scrim').classList.add('on');
   $('#lastCallSheet').classList.add('on');
+  // Focus the safe action first, never the destructive one.
+  // preventScroll matters here: .phone is overflow:hidden, which stops
+  // *user* scrolling but not programmatic/focus-driven scrolling. Without
+  // it, focus() scrolls the container to reveal this button and drags the
+  // off-screen sheets (translateY(102%), higher z-index) into view on top.
+  $('#lcKeepBtn').focus({ preventScroll: true });
 }
+
 function closeLastCallSheet(){
   $('#lastCallSheet').classList.remove('on');
   $('#scrim').classList.remove('on');
+  $('#htMenuBtn').focus({ preventScroll: true });
 }
 $('#lcKeepBtn').onclick = closeLastCallSheet;
-$('#lcEndBtn').onclick  = () => { closeLastCallSheet(); doLastCall(); };
 
-async function doLastCall(){
-  overlay('Closing out','NETTING THE LEDGER…');
-  const { error } = await sb.rpc('close_night', { p_night_id: night.id, p_dust_cents: DUST_CENTS });
-  if(error){ hideOverlay(); return toast(error.message, true); }
-  await refresh();
-  setTimeout(() => { hideOverlay(); goTab('tab'); toast('Tab closed.'); }, 900);
-}
+// Simple two-element focus trap — Tab/Shift+Tab wrap between Keep Night
+// Open and End Night rather than escaping into the page behind the
+// scrim; Escape closes the same as Keep Night Open. This sheet gets
+// real trapping (unlike the app's other sheets, deliberately) because
+// this prompt explicitly calls for it on a genuinely consequential action.
+$('#lastCallSheet').addEventListener('keydown', ev => {
+  if(ev.key === 'Escape'){ ev.preventDefault(); closeLastCallSheet(); return; }
+  if(ev.key !== 'Tab') return;
+  const first = $('#lcKeepBtn'), last = $('#lcEndBtn');
+  if(ev.shiftKey && document.activeElement === first){ ev.preventDefault(); last.focus({ preventScroll: true }); }
+  else if(!ev.shiftKey && document.activeElement === last){ ev.preventDefault(); first.focus({ preventScroll: true }); }
+});
+
+$('#lcEndBtn').onclick = async () => {
+  const btn = $('#lcEndBtn');
+  btn.disabled = true;
+  const prevLabel = btn.textContent;
+  btn.textContent = 'Ending…';
+  try {
+    const { error } = await sb.rpc('close_night', { p_night_id: night.id, p_dust_cents: DUST_CENTS });
+    if(error){
+      // Failure: sheet stays open, night stays active, button re-enabled —
+      // never navigate away or update Live→Ended on a failed attempt.
+      btn.disabled = false;
+      btn.textContent = prevLabel;
+      return toast(error.message, true);
+    }
+    // Not refresh() — that's debounced (setTimeout 220ms) and isn't really
+    // awaitable; "await refresh()" was resolving before the real data (with
+    // night.status now 'closed') had actually landed, so the screen briefly
+    // showed stale still-open content that then visibly swapped ~220ms
+    // later. Fetching directly here, the same shape as load()'s fetch,
+    // guarantees night.status is genuinely fresh before refreshPlan() runs —
+    // which matters, since refreshPlan() branches on that exact value to
+    // decide whether to read the frozen settlement snapshot or recompute live.
+    //
+    // Also cancel any pending debounced refresh queued by the realtime
+    // subscription — close_night() itself writes to expense/settlement/
+    // night, all subscribed tables, so one could already be scheduled
+    // independent of this handler. Left alone it could fire moments after
+    // this handler's own render below, redundantly rebuilding the Tab
+    // pane's innerHTML from scratch a second time (restarting the
+    // settlement cards' CSS animations) even though nothing changed again.
+    clearTimeout(refreshT);
+    const [n, mem, st, exp, bal] = await Promise.all([
+      sb.from('night').select('*').eq('id', night.id).single(),
+      sb.from('night_member').select('*, person(*)').eq('night_id', night.id),
+      sb.from('stop').select('*').eq('night_id', night.id).order('seq'),
+      sb.from('expense').select('*, allocation(*)').eq('night_id', night.id).order('occurred_at'),
+      sb.from('night_balance').select('*').eq('night_id', night.id),
+    ]);
+    night    = n.data ?? night;
+    members  = (mem.data || members).sort((a,b)=> new Date(a.joined_at) - new Date(b.joined_at));
+    stops    = st.data || stops;
+    expenses = exp.data || expenses;
+    balances = bal.data || balances;
+    await refreshPlan();
+    renderAll();
+    goTab('tab');
+    closeLastCallSheet();
+    toast('Night ended — tab finalized');
+  } catch (err) {
+    // Anything unexpected here — a network failure, a malformed response,
+    // anything — previously left the button stuck disabled on "Ending…"
+    // forever with no feedback at all, which looks exactly like a crash
+    // no matter what actually caused it. Now every failure path, known or
+    // not, guarantees the same recovery: button re-enabled, night left
+    // active, a real error shown.
+    btn.disabled = false;
+    btn.textContent = prevLabel;
+    toast(err?.message || 'Something went wrong ending the night — try again', true);
+  }
+};
 
 /* ============================================================
    ADD / EDIT SHEET
@@ -937,7 +1035,12 @@ $('#toggleKind').onclick = () => {
   applyKindLabels();
   renderSheet();
 };
-function show(){ renderSheet(); $('#scrim').classList.add('on'); $('#sheet').classList.add('on'); }
+function closeAllSheets(){
+  ['sheet','editSplitSheet','detailsSheet','stopSheet','lastCallSheet'].forEach(id => {
+    $('#'+id)?.classList.remove('on');
+  });
+}
+function show(){ closeAllSheets(); renderSheet(); $('#scrim').classList.add('on'); $('#sheet').classList.add('on'); }
 function close(){
   $('#scrim').classList.remove('on'); $('#sheet').classList.remove('on');
   // Abandoning the whole flow closes any child sheet left open too.
@@ -1285,7 +1388,6 @@ $('#receiptFile').onchange = async e => {
   toast('Receipt attached');
 };
 $('#btnRound').onclick   = () => openAdd('round');
-$('#btnLastCallFab').onclick = () => { if(isHost()) confirmLastCall(); };
 $('#btnStop').onclick    = () => openNewStop();
 $('#cancelBtn').onclick  = close;
 $('#sheetCloseBtn').onclick = close;
@@ -1296,6 +1398,7 @@ $('#scrim').onclick      = () => {
 };
 
 function openNewStop(){
+  closeAllSheets();
   $('#stopName').value = '';
   $('#scrim').classList.add('on');
   $('#stopSheet').classList.add('on');
@@ -1304,10 +1407,15 @@ function closeStopSheet(){ $('#stopSheet').classList.remove('on'); $('#scrim').c
 $('#stopCancel').onclick = closeStopSheet;
 $('#stopGo').onclick = async () => {
   $('#stopGo').disabled = true;
-  const { error } = await sb.rpc('add_stop', { p_night_id: night.id, p_name: $('#stopName').value.trim() || null });
-  closeStopSheet();
-  $('#stopGo').disabled = false;
-  toast(error ? error.message : 'Logged the move', !!error);
+  try {
+    const { error } = await sb.rpc('add_stop', { p_night_id: night.id, p_name: $('#stopName').value.trim() || null });
+    closeStopSheet();
+    toast(error ? error.message : 'Logged the move', !!error);
+  } catch (err) {
+    toast(err?.message || 'Something went wrong — try again', true);
+  } finally {
+    $('#stopGo').disabled = false;
+  }
 };
 
 $('#voidBtn').onclick = async () => {
@@ -1413,12 +1521,11 @@ function showGuide(){
 
 $('#htMark').innerHTML = compactMark();
 
-// Overflow menu — the shared integration point from Prompt 0. This pass
-// adds Show join code / Share night, and removes the old conditional
-// Leave/Close swap: Close/End night is explicitly Prompt 4's to build,
-// so it's not exposed here at all (confirmLastCall() itself is untouched
-// and still reachable via the bottom action tray's own Last Call button —
-// this menu just no longer calls it).
+// Overflow menu — the shared integration point from Prompt 0. Show join
+// code / Share night were added in Prompt 1; End night is this prompt's
+// addition, in its own separated destructive section per spec, host-only
+// (confirmed server-side in close_night() — not just a client-side
+// courtesy hide).
 //
 // Leave night is now always shown, not conditionally hidden for hosts.
 // Checked the actual leave_night() RPC directly rather than assume: it
@@ -1428,10 +1535,14 @@ $('#htMark').innerHTML = compactMark();
 // only-host case surfaces as an understandable error via the existing
 // confirmLeaveNight() error handling, rather than being silently
 // prevented by hiding the menu item with no explanation.
+function updateNightMenu(){
+  $('#htEndDivider').style.display = isHost() ? 'block' : 'none';
+  $('#htEndNight').style.display   = isHost() ? 'block' : 'none';
+}
 function closeNightMenu(returnFocus){
   $('#htMenu').style.display = 'none';
   $('#htMenuBtn').setAttribute('aria-expanded', 'false');
-  if(returnFocus !== false) $('#htMenuBtn').focus();
+  if(returnFocus !== false) $('#htMenuBtn').focus({ preventScroll: true });
 }
 $('#htMenuBtn').onclick = () => {
   const open = $('#htMenu').style.display === 'block';
@@ -1440,7 +1551,7 @@ $('#htMenuBtn').onclick = () => {
   $('#htMenuBtn').setAttribute('aria-expanded', 'true');
   // Move focus into the menu, per this prompt's explicit requirement —
   // Prompt 0 didn't need this since it was a much simpler menu.
-  $('#htMenu').querySelector('.ht-menu-item')?.focus();
+  $('#htMenu').querySelector('.ht-menu-item')?.focus({ preventScroll: true });
 };
 document.addEventListener('click', e => {
   if($('#htMenu').style.display === 'block' &&
@@ -1460,6 +1571,7 @@ $('#htShareNight').onclick  = async () => {
 };
 $('#htSwitchNight').onclick = () => { closeNightMenu(false); confirmSwitchNight(); };
 $('#htLeaveNight').onclick  = () => { closeNightMenu(false); confirmLeaveNight(); };
+$('#htEndNight').onclick    = () => { closeNightMenu(false); if(isHost()) confirmLastCall(); };
 
 // Consolidated invite flow — reuses the exact same code+QR+copy pattern
 // as showNightCreated() (shown right after creating a night), so there's

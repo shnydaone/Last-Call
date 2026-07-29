@@ -5,6 +5,111 @@ Dates below are conversation dates, not deploy dates. Entries under
 `last-call-handoff.md` briefing — no specific dates are available for them,
 so none are guessed.
 
+## 2026-07-29
+
+### Added
+- `js/settlement.js` — canonical settlement presentation layer. One place
+  that owns sign interpretation, currency formatting, zero-state handling,
+  and payment-state wording, so no two screens can describe the same
+  financial state differently again. Three functions: `settlementFor()`
+  (participant-level), `transferInstruction()` (relationship-level),
+  `nightSettlementSummary()` (night-level).
+- The Tab: settlement instruction is now the first thing on the screen —
+  one card per required transfer (payer, receiver, amount, pending/paid),
+  with the full receipt demoted into a collapsed "How this was calculated"
+  section beneath a compact summary.
+- End night confirmation now shows the full spec'd field set: night name,
+  total, rounds · stops, people still active, canonical settlement state.
+  Rounds and stops were genuinely missing before, not just unlabeled.
+- Real focus-trap on the End night sheet specifically (Tab/Shift+Tab wrap,
+  Escape closes, focus returns to the menu trigger, focus lands on the
+  safe action never the destructive one). Deliberately not retrofitted to
+  the app's other four sheets — see Notes.
+- `closeAllSheets()` — one shared guarantee that opening any top-level
+  sheet first closes every other one.
+
+### Fixed
+- **`money(-0)` rendered `"-$0.00"`.** Confirmed in node before touching
+  anything. Any tiny negative residual rounding to zero cents would have
+  shown the same way. Fixed at the source in `utils.js`, so every caller
+  benefits rather than just settlement.
+- **Contradictory settlement language across screens.** "ALL SQUARE" /
+  "No payments needed" could appear while Crew simultaneously said someone
+  owed money. Now every screen routes through `settlement.js`.
+- **Netting-graph jargon leaking into the UI** — "3 debts → 0 payments"
+  replaced with "N payments remaining" / "Everyone is settled".
+- **`.focus()` was scrolling hidden sheets into view.** The real cause of
+  the End-night "screen scrolled up and I saw cards underneath" bug, found
+  only after several wrong theories. `.phone` is `overflow:hidden`, which
+  blocks *user* scrolling but not programmatic scrolling; `.focus()` scrolls
+  ancestors to reveal its target, which dragged the off-screen
+  `#detailsSheet` (`translateY(102%)`, z-index 50) up over everything.
+  Fixed with `focus({preventScroll:true})` everywhere the target is already
+  on-screen, plus `visibility:hidden` on closed sheets as a safety net so
+  the class of bug can't recur.
+- **Compiled single-file build was broken by a leftover import.** The build
+  script stripped local imports from `app.js` but not from the newly-added
+  `settlement.js`, so `money` was declared twice in one module scope — a
+  `SyntaxError` that stopped the entire script from executing. The build
+  now asserts zero leftover imports and zero duplicate top-level
+  declarations *before* writing the file.
+- **End night could leave a stuck "Ending…" button.** No try/catch wrapped
+  the handler, so any unexpected throw left it disabled forever with no
+  feedback — indistinguishable from a crash. Same gap fixed in Mark Paid
+  and Add Stop.
+- **End night's data was read before it was ready.** `await refresh()`
+  looked awaitable but isn't (it's `setTimeout`-debounced internally), so
+  the UI rendered from still-open data and visibly swapped ~220ms later.
+  Now fetches directly and genuinely awaits, which also matters because
+  `refreshPlan()` branches on `night.status` to decide between the frozen
+  settlement snapshot and a live recompute.
+- **Scrim was only 75% opaque**, so background changes during End night
+  (tab switch + scroll reset) were dimly visible through it. Raised to 97%.
+- **QR code scannability** — 150px at `margin:1` (a 1-module quiet zone,
+  vs. the library default of 4). Now 220px at `margin:3`, with the CSS
+  display size matched 1:1 so browser scaling can't blur the modules.
+  Colour contrast was measured and ruled out first (15.67:1).
+
+### Changed
+- **Bottom action bar is now two buttons, not three.** Last Call removed;
+  End night moved into the global overflow menu in its own separated
+  destructive section, host-only. The existing 1.6:1 flex ratio already
+  landed in the spec's suggested 60–70/30–40 split once the third button
+  was gone, so no ratio change was needed.
+- Destructive action relabeled to **"End night"** everywhere (was "Last
+  Call" / "Close"). The product is still called Last Call; the button now
+  describes what it does.
+- Payment status wording: "Unpaid" / "Marked paid" → "Payment pending" /
+  "Paid".
+- End night confirmation copy no longer implies irreversibility — verified
+  against the live `reopen_night()` RPC that ending a night is genuinely
+  reversible, and says so.
+
+### Notes
+- **Confirmed against the live database, not assumed:** `net_cents =
+  paid_cents - owed_cents` (positive → gets back, negative → owes);
+  `close_night()` enforces `host_id = auth.uid()` server-side, so End
+  night's host-only menu visibility mirrors real enforcement rather than
+  substituting for it; `reopen_night()` exists, so ending is reversible.
+- **Payment model documented:** the app tracks a *calculated obligation
+  plus manual confirmation*, not real money movement. "Everyone is
+  settled" means no transfer is required or every one is marked paid — it
+  never claims money actually moved.
+- Focus-trap was added to the End night sheet only. The other four sheets
+  still have no trap, matching the existing documented reasoning — this
+  one got it because it's the one genuinely consequential action.
+- No test suite exists in this project. Verification each pass: `node
+  --check`, a full `$('#...')`-against-HTML cross-reference (split into
+  top-level vs. function-scoped, since a top-level reference to a removed
+  element throws on load), a byte-diff of all nine calculation functions,
+  and standalone runs of `settlement.js` against every case in the spec's
+  test list including the Eric/Joe example, negative zero, and tiny
+  floating residuals.
+- Several fixes this session were reached only after wrong theories.
+  The screen recording and console screenshots diagnosed in minutes what
+  static code review missed across several attempts — worth reaching for
+  earlier next time.
+
 ## 2026-07-28
 
 ### Added

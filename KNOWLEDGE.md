@@ -25,6 +25,8 @@ js/
   brand.js           logo mark + wordmark — landing overlay, info guide,
                      and a compact header variant (headerBrand())
   qr.js               QR-code rendering, wraps the qrcode dependency
+  settlement.js       canonical settlement wording — sign interpretation,
+                      currency formatting, zero-state, payment-state copy
   app.js              state, auth/boot, rendering, sheets, realtime sync
 ```
 
@@ -239,6 +241,41 @@ public, and the open gap on access control.
   untouched rather than push it further under while lightening
   everything else.
 
+- `money(-0)` rendered `"-$0.00"` — confirmed in node, not assumed. Any
+  tiny negative residual rounding to zero cents hit the same path. Fixed
+  in `utils.js` so every caller benefits, not just the settlement display.
+- **`.focus()` scrolled hidden sheets into view.** This is the one that
+  took the longest to find, and it's worth understanding because the
+  pattern is easy to reintroduce. `.phone` is `overflow:hidden`, every
+  sheet is `position:absolute; bottom:0` hidden via `transform:
+  translateY(102%)`, and `.focus()` makes the browser scroll ancestors to
+  reveal its target. `overflow:hidden` blocks *user* scrolling but not
+  programmatic scrolling — so focusing a button inside the newly-opened
+  End night sheet scrolled the container and dragged the off-screen
+  `#detailsSheet` (z-index 50, above End night's 40) into view on top of
+  everything. The JS logic was correct the whole time; nothing had a
+  stray `.on` class. Fixed with `focus({preventScroll:true})` plus
+  `visibility:hidden` on closed sheets so they can't render even if
+  something does scroll.
+- The compiled single-file build silently broke when `settlement.js` was
+  added: the build script stripped local imports from `app.js` but not
+  from the new module, so `money` was declared twice in one module scope.
+  A `SyntaxError` stops the *entire* script from executing — including
+  the error-overlay code further down the same file — which presents as
+  a totally blank app with no visible error. The build script now asserts
+  zero leftover local imports and zero duplicate top-level declarations
+  before writing.
+- `await refresh()` looks awaitable but isn't — `refresh()` is
+  `setTimeout`-debounced internally and returns nothing, so awaiting it
+  resolves immediately. End night rendered from stale still-open data
+  that then visibly swapped ~220ms later. Anywhere freshness genuinely
+  matters, fetch directly (the shape `load()` uses) rather than calling
+  `refresh()`.
+- Several handlers (`End night`, `Mark Paid`, `Add Stop`) disabled their
+  button before an `await` with no `try/catch` — any unexpected throw
+  left the button disabled forever with no feedback, indistinguishable
+  from a crash. All three now guarantee recovery.
+
 ## Status: visual/UX redesign passes
 
 1. ✅ Inspection + implementation plan (no code)
@@ -420,7 +457,24 @@ public, and the open gap on access control.
     `currentTab==='tonight' && !expenses.length`, not a blanket rule),
     Crew intro row bumped from the 44px app-wide floor to 56px per this
     spec's specific target.
-23. Not yet specified by the person.
+23. ✅ Canonical settlement + settlement-first Tab (prompt 3 of 6). New
+    `js/settlement.js` owns all directional language, currency
+    formatting, zero/negative-zero handling, and payment-state wording.
+    Crew cards now consume it instead of their own copy. The Tab was
+    restructured so the required payment is the first thing on screen,
+    with the full receipt collapsed under "How this was calculated".
+    Confirmed the sign convention and the payment-status model against
+    the live DB before touching display logic.
+24. ✅ Bottom bar + end-night flow (prompt 4 of 6). Bottom bar reduced to
+    Add Round + Add Stop; End night moved into the existing overflow menu
+    in its own destructive section, host-only, matching the server-side
+    check in `close_night()`. Confirmation sheet gained the full field
+    set, a real focus trap, non-destructive default focus, honest
+    reversibility copy (verified `reopen_night()` exists), and correct
+    failure behaviour — the sheet now stays open through the whole
+    attempt rather than closing first and leaving a failure with nowhere
+    to report to.
+25. Not yet specified by the person.
 
 ## Known open gaps (real, not yet fixed)
 
@@ -430,8 +484,10 @@ public, and the open gap on access control.
 - **`venmo_handle` and `ocr_payload`** — schema columns exist, zero UI or
   logic uses them. (`receipt_url` is no longer in this list — it's real
   now, see redesign pass #16.)
-- **QR code scannability** — generated and structurally correct, but not
-  yet confirmed against a real phone camera.
+- **QR code scannability** — improved this pass (150px→220px, quiet-zone
+  margin 1→3, CSS size matched 1:1 to canvas resolution so scaling can't
+  blur it; contrast measured at 15.67:1 and ruled out as a factor). Still
+  not confirmed against a real phone camera.
 - **`app.js` is still a monolith** — see File structure above for the
   tradeoff. Not a bug, just the next real modularization decision if it
   comes up.
@@ -439,10 +495,11 @@ public, and the open gap on access control.
   `description` and now `receipt_url`'s alt text, which are escaped/safe
   by construction) — a pre-existing gap, not introduced or fixed in any
   of these passes. Worth a dedicated look if it becomes a priority.
-- **No focus-trap/`aria-modal` on the bottom sheets** — deliberately not
-  added without real focus-trapping behind it; still open. Now applies
-  to five sheets instead of three (the two new Add Round children
-  included).
+- **No focus-trap/`aria-modal` on four of the five bottom sheets.** The
+  End night sheet now has a real trap (`role=dialog`, `aria-modal`,
+  Tab/Shift+Tab wrap, Escape, focus restore) because it's the one
+  genuinely consequential action. The other four are unchanged and still
+  deliberately untrapped rather than half-trapped.
 - **The `receipts` storage bucket is public**, not gated by night
   membership. Deliberate, documented tradeoff (see Architectural
   decisions) — paths are namespaced by night ID + a random UUID, not
@@ -453,12 +510,17 @@ public, and the open gap on access control.
   then cancels the sheet, it stays in storage with nothing pointing to
   it. Harmless (never surfaced anywhere, never billed), just untidy. No
   cleanup job exists.
-- **The header is now genuinely two-state (Approach A)** — the earlier
-  "Approach B" gap entry is resolved; `header` collapses in place rather
-  than a separate bar fading in on top of a permanent expanded state.
-  The specific thresholds (80px down / 10px up, `92dvh`-style targets
-  elsewhere) are picked from spec ranges, not tuned against a live
-  device — worth a look on an actual phone.
+- **The header is now permanently compact** (prompt 0) — the two-state
+  collapsing system, its scroll listener, and its thresholds are all
+  gone, which also retires the old "thresholds not tuned on a real
+  device" gap. `92dvh`-style sheet targets elsewhere are still
+  spec-derived rather than device-tuned.
+- **`settle_night` 403s for an unauthenticated caller** — correct, not a
+  bug: the RPC is not `SECURITY DEFINER`, so it runs with the caller's
+  own privileges and every RLS policy it depends on is scoped to
+  `authenticated`. It surfaces as a console error with a graceful empty
+  fallback. Worth knowing because it looks alarming when testing the
+  compiled single file over `file://`, which can never hold a session.
 - **Tip UI has now reversed twice** (total-first/opt-in → always-visible
   presets) across two passes, both times per explicit instruction, not
   drift. Worth confirming this is the settled direction before it

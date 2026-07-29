@@ -9,6 +9,6 @@ import QRCode from 'https://esm.sh/qrcode@1.5.3';
    ============================================================ */
 export function renderInviteQR(canvas, url){
   return QRCode.toCanvas(canvas, url, {
-    width: 150, margin: 1, color: { dark: '#1A1520', light: '#F5EFE6' }
+    width: 220, margin: 3, color: { dark: '#1A1520', light: '#F5EFE6' }
   });
 }

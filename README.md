@@ -28,6 +28,10 @@ js/
                      one <h1>), and compactMark() (bare mark only, for the
                      scroll-reminder bar)
   qr.js               QR-code rendering — the app's one point of contact with the qrcode dependency
+  settlement.js       canonical settlement wording — the single source of truth for who owes,
+                      who receives, how much, and whether anything is still outstanding. Every
+                      screen that describes a financial state routes through here so no two can
+                      contradict each other
   app.js              state, auth/boot, rendering, sheets, realtime sync — the stateful "core"
 ```
 
@@ -39,6 +43,21 @@ binding from outside its own module) or accepting circular imports between
 render/sheet/boot code that all call each other. Both are real, doable
 follow-ups — just a separate, carefully-tested pass rather than folded into
 this one. See KNOWLEDGE.md for the fuller version of this tradeoff.
+
+## Settlement language
+
+All directional money language ("Owes $X", "Gets back $X", "Joe pays Eric
+$11.54", "Everyone is settled") comes from `js/settlement.js`. If you're
+adding a screen that talks about balances, import from there rather than
+formatting your own — that module exists specifically because the same
+state used to be described three different ways on three different
+screens. The sign convention it encodes (`net_cents = paid_cents -
+owed_cents`; positive means money comes back to you) is verified against
+the `night_balance` view, not assumed.
+
+Note that "settled" means *no transfer is required, or every required
+transfer has been marked paid*. The app tracks calculated obligations plus
+manual confirmation — it never moves money and never claims to.
 
 ## Running locally
 
@@ -53,6 +72,13 @@ python3 -m http.server 8080
 
 Then open the printed `localhost` URL. Double-clicking `index.html` will
 load styling but the app itself won't boot (no Supabase connection).
+
+There's also a compiled single-file build, `last-call-app.html`, with all
+CSS and JS inlined. It's useful for quick viewing, but it loads as
+`file://`, which has no real web origin — so it can never hold a Supabase
+login session. Anything requiring auth (settlement previews, ending a
+night, realtime sync) will return 403 there by design. Test real
+behaviour against the deployed site, not this file.
 
 ## Icons / PWA
 
