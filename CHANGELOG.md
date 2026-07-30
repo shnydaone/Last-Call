@@ -5,6 +5,63 @@ Dates below are conversation dates, not deploy dates. Entries under
 `last-call-handoff.md` briefing — no specific dates are available for them,
 so none are guessed.
 
+## 2026-07-29 (feature/polish batch + auto-close scheduled job)
+
+Started from an uploaded copy of the repo (to sync context after the prior
+close/reopen bug-hunt session) plus a screenshot of a Tonight-tab card.
+Four small features/fixes, one visual revision based on direct feedback,
+and one piece of database automation.
+
+### Added
+- **Change your name mid-night** — overflow menu → "Change your name."
+  Direct write to `person.display_name`, permitted by the existing
+  `person_self_write` RLS policy (`id = auth.uid()`) — no new RPC. Since
+  this is an identity field, not night-scoped, it updates everywhere that
+  person appears, in any night they're in.
+- **Move an expense to a different stop**, from the edit sheet. New Stop
+  picker pill (same shape as the existing Paid-by pill), shown only in
+  edit mode and only with 2+ stops. `stop_id` now included in the edit
+  save. Fixes the "forgot to log We Moved before the next round" case.
+- **`auto_close_stale_nights(p_days integer default 7)`**, scheduled via
+  `pg_cron` daily at 3am UTC — closes any night with no activity
+  (started/created/last-round/last-stop/last-settlement, whichever's most
+  recent) for 7+ days. Mirrors `close_night(uuid, integer)`'s own closing
+  logic but skips the host check (a cron job has no session); locked down
+  so only `postgres`/`service_role` can call it. Verified against live
+  data before scheduling — nothing was within days of the threshold.
+- **In-app guide additions** — flagging (holds an expense out, doesn't
+  delete it), tap-to-edit on any round/expense, and a one-line
+  clarification that Mark Paid never moves real money.
+
+### Changed — visual
+- **Mark Paid** — was a same-color-family text swap ("Payment pending" →
+  "Paid"), easy to miss. Now: real teal-tinted card background/border,
+  the amount steps down to a muted color once paid, and a small SVG
+  checkmark pops in next to "Paid."
+- **Receipt** — added a coarse duration folded into the existing status
+  line ("Night closed at 1:42 AM · 5h 28m"), a "BY STOP" subtotal section
+  (2+ stops with spend only), and a "WHO PAYS WHO" section listing actual
+  transfer directions (`Eric → Rocco $24.00`). That last one replaced an
+  initial per-person net +/− design after direct feedback that pairwise
+  transfers were clearer than net position — not kept as an alternate
+  view, just swapped.
+- **Expense-card action buttons** — the paperclip (receipt) and flag
+  buttons were visually mismatched (bare icon vs. icon+text label,
+  different sizes). Unified into one row of matching 28×28 icon buttons.
+  The flag's "⚑" emoji was replaced with a real `currentColor` SVG (same
+  class of fix as the receipt icon in an earlier pass — emoji don't
+  reliably take a CSS color). The "Flag"/"Flagged" text label was
+  dropped without losing information: `.exp-flagtag` in the card header
+  already says "Flagged" once disputed.
+
+### Found, not fixed (flagged in KNOWLEDGE.md)
+- `close_night(uuid)`, the 1-arg pre-dust-cents overload, is dead code —
+  it calls a `settle_night` overload that no longer exists.
+- This repo's export is flat (files at root) but `index.html` expects
+  `js/` and `icons/` subfolders. Not confirmed whether the real deploy
+  has the right layout or this is a live bug — worth checking next time
+  the actual site is being debugged.
+
 ## 2026-07-29 (close/reopen data-integrity bug hunt)
 
 Started from a single report — "can't fully end a night, it gets stuck" —

@@ -8,6 +8,17 @@ export const $  = s => document.querySelector(s);
 export const money  = c => ((c === 0 ? 0 : c) / 100).toLocaleString('en-US', { style:'currency', currency:'USD' });
 export const money0 = c => '$' + Math.round(c/100).toLocaleString();
 export const clock  = ts => new Date(ts).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+
+// Whole-hours-and-minutes span for the receipt's timeline — deliberately
+// coarse (no seconds), matches the informal tone of a night out rather
+// than reading like a stopwatch.
+export function duration(startMs, endMs){
+  const mins = Math.max(0, Math.round((endMs - startMs) / 60000));
+  const h = Math.floor(mins / 60), m = mins % 60;
+  if(h === 0) return `${m}m`;
+  if(m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
 export const initials = n => (n||'?').slice(0,2).toUpperCase();
 
 // Display-only grouping — "LASTCALL" → "LAST CALL". Purely cosmetic:

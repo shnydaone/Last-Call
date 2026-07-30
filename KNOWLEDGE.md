@@ -78,6 +78,15 @@ used, see below) · `allocation` (weight-based, supports uneven shares) ·
 Key RPCs: `join_night`, `create_night`, `leave_night`, `add_stop`,
 `settle_night`, `close_night`, `reopen_night`, `sync_permanence`.
 
+**Scheduled maintenance:** `auto_close_stale_nights(p_days integer default
+7)` — a `pg_cron` job (`auto-close-stale-nights`, daily 3am UTC) that
+closes any night untouched (no new round/stop/settlement, checked against
+`greatest(started_at, created_at, last expense, last stop, last
+marked_paid)`) for 7+ days. Runs the same closing steps `close_night`
+does, but with no `host_id`/`auth.uid()` check — a cron job has no
+session — so `EXECUTE` is revoked from `anon`/`authenticated` and granted
+only to `postgres`/`service_role`. Not callable from the client at all.
+
 Derived views: `allocation_share` (per-person cent share, deterministic
 penny remainders), `night_balance` (paid/owed/net per person — **never**
 cache this, always compute from expenses).
@@ -588,10 +597,74 @@ public, and the open gap on access control.
     settlement instruction 15→20px / amount 24→28px, plus smaller bumps
     across buttons toward the spec's primary-action floor. The receipt
     block was deliberately left alone — see Architectural decisions.
-26. Not yet specified by the person.
+26. ✅ Small feature/polish batch (name change, stop reassignment,
+    Mark Paid visuals, receipt additions, expense-card cleanup).
+    - **Change your name mid-night** — overflow menu → "Change your
+      name." Writes straight to `person.display_name` (RLS's
+      `person_self_write: id = auth.uid()` already permits this — no new
+      RPC needed). It's an identity-level field, not night-scoped, so
+      this updates the name everywhere that person appears, in every
+      night they're in, not just the current one.
+    - **Move an expense to a different stop**, from the edit sheet.
+      Added a Stop picker pill (same interaction shape as the existing
+      Paid-by pill) — only rendered in edit mode, and only when the
+      night has 2+ stops. `stop_id` is now included in the edit save
+      alongside payer/description/receipt; new rounds are unaffected,
+      still auto-attaching to the current stop.
+    - **Mark Paid visual redesign.** It used to be a same-color-family
+      text swap ("Payment pending" → "Paid"), easy to miss. Paid cards
+      now get a real teal-tinted background/border wash, the amount
+      steps down from accent to secondary color (no longer the call to
+      action), and a small SVG checkmark pops in next to "Paid."
+    - **Receipt additions** (duration, per-stop breakdown, who-pays-who)
+      — folded a coarse duration ("5h 28m") into the existing status
+      line rather than adding a new one; added a "BY STOP" section
+      (only when 2+ stops actually have spend, since one stop is already
+      the NIGHT TOTAL line); added a "WHO PAYS WHO" section listing the
+      actual transfer directions (`Eric → Rocco $24.00`). That last one
+      went through a revision — first pass showed each person's net
+      +/− position, which the person found harder to read than just the
+      direct pairwise transfers already shown as cards above the
+      receipt; replaced rather than kept both.
+    - **Expense-card action buttons cleaned up.** The paperclip
+      (receipt) and flag buttons were visually mismatched — a bare icon
+      next to an icon+text label of different size/weight. Unified into
+      one row of matching 28×28 icon-only buttons. The flag's "⚑" emoji
+      was also replaced with a real SVG using `stroke="currentColor"`,
+      same fix already applied to the receipt icon in redesign pass #21
+      — emoji don't reliably respect CSS `color`, so the flag's
+      active/inactive color states may never have rendered correctly.
+      Dropping the "Flag"/"Flagged" text label doesn't lose information:
+      `.exp-flagtag` in the card header already announces "Flagged"
+      once disputed, so the button repeating it was redundant weight,
+      not the only place it's said.
+    - **In-app guide (`showGuide()`) additions** — explained what
+      flagging actually does (holds an expense out of the tab, doesn't
+      delete it), that any round/expense is tap-to-edit (including,
+      now, which stop it's under), and that Mark Paid is a bookkeeping
+      checkbox, not a real money transfer.
+    - **Database:** added `auto_close_stale_nights` and its `pg_cron`
+      schedule (see Schema above) — nights untouched for 7+ days now
+      close themselves automatically instead of staying open forever.
+27. Not yet specified by the person.
 
 ## Known open gaps (real, not yet fixed)
 
+- **`close_night(uuid)` (the 1-arg, pre-dust-cents overload) is dead
+  code.** It internally calls `settle_night(p_night_id)` with one
+  argument, but only `settle_night(uuid, integer)` exists anymore — so
+  this overload would throw if anything ever actually called it. The
+  app only calls the 2-arg `close_night(uuid, integer)`. Found while
+  building `auto_close_stale_nights`, which was deliberately based on
+  the live 2-arg version's logic instead. Not removed — just flagged,
+  since dropping a DB function isn't something to fold into an
+  unrelated feature pass.
+- **This repo's actual layout is flat** (`app.js`, `styles.css`,
+  `config.js`, etc. all at root) **but `index.html` references
+  `js/app.js` and `icons/icon.*`.** Either the live Netlify deploy has
+  those subfolders and this particular export just doesn't reflect it,
+  or it's genuinely broken — not confirmed either way this session.
+  Worth a quick check next time the actual deploy is being debugged.
 - **Stop detection is still manual** — no automatic venue-change detection
   (the four-layer plan: time gap → coarse location → venue chips → receipt
   backfill was scoped early on, never built).

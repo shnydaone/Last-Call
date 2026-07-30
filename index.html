@@ -40,6 +40,7 @@
     <button class="ht-menu-item" id="htJoinCode" role="menuitem">Show join code</button>
     <button class="ht-menu-item" id="htShareNight" role="menuitem">Share night</button>
     <button class="ht-menu-item" id="htSwitchNight" role="menuitem">Switch night</button>
+    <button class="ht-menu-item" id="htChangeName" role="menuitem">Change your name</button>
     <div class="ht-menu-divider" role="separator"></div>
     <button class="ht-menu-item danger" id="htLeaveNight" role="menuitem">Leave this night entirely</button>
     <div class="ht-menu-divider" role="separator" id="htEndDivider" style="display:none"></div>
@@ -84,6 +85,15 @@
         <button class="kind-switch-compact" id="toggleKind" type="button"></button>
       </div>
       <div class="who" id="payerRow" style="display:none"></div>
+
+      <div class="row-combo" id="stopPickRow" style="display:none">
+        <span class="field-label" style="max-width:none;margin:0">Stop</span>
+        <button class="payer-pill" id="stopPill" type="button" aria-expanded="false" style="margin-left:-4px;margin-right:auto">
+          <span id="stopPillName"></span>
+          <svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+      </div>
+      <div class="who" id="stopPickerRow" style="display:none"></div>
 
       <div class="amount-display" id="amtDisp" aria-live="polite"></div>
       <div class="tip-row" id="tipRow">

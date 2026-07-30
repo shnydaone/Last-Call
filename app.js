@@ -1,5 +1,5 @@
 import { sb, DUST_CENTS, PLAYFUL_SUMMARIES } from './config.js';
-import { $, money, money0, clock, initials, groupCode, shareInvite, colorFor, escapeHtml } from './utils.js';
+import { $, money, money0, clock, duration, initials, groupCode, shareInvite, colorFor, escapeHtml } from './utils.js';
 import { brandBlock, compactMark } from './brand.js';
 import { renderInviteQR } from './qr.js';
 import { settlementFor, transferInstruction, nightSettlementSummary } from './settlement.js';
@@ -447,17 +447,19 @@ function renderTonight(){
           </div>
           <div class="exp-amt-col">
             <div class="exp-amt">${money(totalOf(e))}</div>
-            <button class="receipt-btn ${e.receipt_url?'on':''}" data-receipt="${e.receipt_url?e.id:''}"
-              aria-label="${e.receipt_url ? 'View attached receipt' : 'No receipt attached'}"
-              title="${e.receipt_url ? 'View receipt' : 'No receipt attached'}">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
-            </button>
+            <div class="exp-actions">
+              <button class="exp-icon-btn ${e.receipt_url?'on':''}" data-receipt="${e.receipt_url?e.id:''}"
+                aria-label="${e.receipt_url ? 'View attached receipt' : 'No receipt attached'}"
+                title="${e.receipt_url ? 'View receipt' : 'No receipt attached'}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+              </button>
+              <button class="exp-icon-btn flag-btn ${e.status==='disputed'?'on':''}" data-flag="${e.id}"
+                aria-label="${e.status==='disputed' ? 'Remove dispute flag — include this back in the tab' : 'Flag as disputed — hold this out of the tab'}"
+                title="${e.status==='disputed' ? 'Unflag' : 'Flag as disputed'}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4"/><path d="M5 4h13l-2.2 4L18 12H5"/></svg>
+              </button>
+            </div>
           </div>
-          <button class="flag ${e.status==='disputed'?'on':''}" data-flag="${e.id}"
-            aria-label="${e.status==='disputed' ? 'Remove dispute flag — include this back in the tab' : 'Flag as disputed — hold this out of the tab'}"
-            title="${e.status==='disputed' ? 'Unflag' : 'Flag as disputed'}">
-            <span class="flag-ico" aria-hidden="true">⚑</span><span class="flag-lbl">${e.status==='disputed'?'Flagged':'Flag'}</span>
-          </button>
           ${isOpen() ? '<span class="exp-chev" aria-hidden="true">›</span>' : ''}
         </div>`;
       }).join('')}
@@ -637,6 +639,43 @@ function confirmSwitchNight(){
   };
 }
 
+function confirmChangeName(){
+  // Updates the shared person row, not anything night-scoped — this is
+  // who you are across every night you're in, same identity model as
+  // promptStart()'s name field. Reuses the exact same overlay+input
+  // shape rather than inventing a second pattern for one field.
+  overlay('Change your name', 'Updates your name everywhere you appear — this night and any other you\'re in.');
+  $('#ovBody').innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px;width:100%">
+      <label class="field-label" for="newNameInput">Your name</label>
+      <input id="newNameInput" placeholder="e.g. Rick" maxlength="24" autocomplete="name"
+        value="${escapeHtml(me.display_name && me.display_name !== 'Guest' ? me.display_name : '')}">
+      <button id="nameGo" style="margin-top:4px">Save</button>
+      <button class="secondary" id="nameCancel">Cancel</button>
+    </div>`;
+  $('#newNameInput').focus();
+  $('#nameCancel').onclick = hideOverlay;
+  $('#nameGo').onclick = async () => {
+    const name = $('#newNameInput').value.trim();
+    if(!name){ $('#ovSub').textContent = 'Enter a name.'; return; }
+    $('#nameGo').disabled = true;
+    $('#nameGo').textContent = 'Saving…';
+    // RLS (person_self_write: id = auth.uid()) is what actually enforces
+    // this is only ever your own row — no RPC needed for a same-table,
+    // same-owner update.
+    const { error } = await sb.from('person').update({ display_name: name }).eq('id', me.id);
+    if(error){
+      $('#ovSub').textContent = error.message;
+      $('#nameGo').disabled = false; $('#nameGo').textContent = 'Save';
+      return;
+    }
+    me.display_name = name;
+    hideOverlay();
+    renderAll();
+    toast('Name updated');
+  };
+}
+
 function confirmLeaveNight(){
   overlay('Leave this night?', 'You\'ll stop seeing it entirely — anyone still in it keeps their tab as-is.');
   $('#ovBody').innerHTML = `
@@ -667,6 +706,18 @@ function renderTab(){
 
   const final = !isOpen();
   const stopsLine = stops.map(s=>s.name).filter(Boolean).join(' → ');
+  // Duration is a timeline fact (first arrival to close/now), independent
+  // of whether anything's been logged yet — shown even on a quiet night.
+  const startTs = stops.length ? new Date(stops[0].arrived_at) : new Date(night.started_at);
+  const endTs = final ? new Date(night.closed_at || Date.now()) : new Date();
+  const durationLabel = duration(startTs, endTs);
+  // Per-stop breakdown — only worth showing once there's more than one
+  // stop to actually compare; a single-stop night already has this exact
+  // number as NIGHT TOTAL two lines down.
+  const stopTotals = stops.map((s,i) => ({
+    label: s.name ?? 'Stop ' + (i+1),
+    total: live.filter(e => e.stop_id === s.id).reduce((a,e)=>a+totalOf(e),0)
+  })).filter(s => s.total > 0);
   // Real per-payment status only exists once closed — while running, plan
   // rows come straight from the live settle_night() preview and have no
   // stable id to act on yet. Same reasoning for gating Pay-in-Venmo below:
@@ -686,7 +737,9 @@ function renderTab(){
     return `<div class="settle-card ${marked?'paid':''}" style="animation-delay:${i*.06}s">
       <div class="settle-instruction">${t.instructionLabel}</div>
       <div class="settle-amount">${t.amountLabel}</div>
-      <div class="settle-status">${marked ? 'Paid' : 'Payment pending'}</div>
+      <div class="settle-status ${marked?'is-paid':''}">${marked
+        ? `<svg class="paid-check" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>Paid`
+        : 'Payment pending'}</div>
       ${(canAct && !marked) ? (iAmOwer
         ? `<a class="venmo" target="_blank" rel="noopener"
              href="https://venmo.com/?txn=pay${handle?'&audience=private&recipients='+encodeURIComponent(handle):''}&amount=${(p.amount_cents/100).toFixed(2)}&note=${encodeURIComponent(night.title)}">Pay in Venmo</a>`
@@ -733,9 +786,9 @@ function renderTab(){
           <div class="r-title">LAST CALL</div>
           ${final
             ? `<div class="r-status final">FINAL TAB</div>
-               <div class="r-status-sub">Night closed${night.closed_at ? ' at ' + clock(night.closed_at) : ''}</div>`
+               <div class="r-status-sub">Night closed${night.closed_at ? ' at ' + clock(night.closed_at) : ''} · ${durationLabel}</div>`
             : `<div class="r-status running">RUNNING TAB</div>
-               <div class="r-status-sub">Night still open</div>`}
+               <div class="r-status-sub">Night still open · ${durationLabel} so far</div>`}
           <div class="r-muted" style="margin-top:6px">${night.title}</div>
           ${stopsLine ? `<div class="r-muted r-name" style="max-width:100%;margin:0 auto">${stopsLine}</div>` : ''}
         </div>
@@ -744,11 +797,17 @@ function renderTab(){
         <div class="r-line"><span>Subtotal</span><span>${money(grand-tips)}</span></div>
         <div class="r-line"><span>Tips</span><span>${money(tips)}</span></div>
         <div class="r-line"><b>NIGHT TOTAL</b><b>${money(grand)}</b></div>
+        ${stopTotals.length > 1 ? `<div class="r-rule"></div>
+          <div class="r-muted r-center" style="margin-bottom:2px">BY STOP</div>
+          ${stopTotals.map(s=>`<div class="r-line r-muted"><span class="r-name">${escapeHtml(s.label)}</span><span>${money(s.total)}</span></div>`).join('')}` : ''}
         ${dustTot ? `<div class="r-dust">Written off under $${(DUST_CENTS/100).toFixed(2)}: ${money(dustTot)}
           (${dust.map(p=>nameOf(p.from_person)).join(', ')})</div>` : ''}
         ${flagged.length ? `<div class="r-rule"></div>
           <div class="r-muted r-center"><span aria-hidden="true">⚑</span> ${flagged.length} flagged &amp; excluded</div>
           ${flagged.map(e=>`<div class="r-line r-muted"><span class="r-name">${e.note}</span><span>${money(totalOf(e))}</span></div>`).join('')}`:''}
+        ${collect.length ? `<div class="r-rule"></div>
+          <div class="r-muted r-center" style="margin-bottom:2px">WHO PAYS WHO</div>
+          ${collect.map(p => `<div class="r-line r-muted"><span class="r-name">${escapeHtml(nameOf(p.from_person))} \u2192 ${escapeHtml(nameOf(p.to_person))}</span><span>${money(p.amount_cents)}</span></div>`).join('')}` : ''}
         ${playfulStatsHtml()}
         <div class="r-rule"></div>
         <div class="r-center r-muted">*** THAT'S LAST CALL, FOLKS ***</div>
@@ -1075,6 +1134,8 @@ function openAdd(kind){
   $('#toggleKind').style.display = 'inline-block';
   $('#pad').style.display = 'grid';
   $('#voidBtn').style.display = 'none';
+  $('#stopPickRow').style.display = 'none';
+  $('#stopPickerRow').style.display = 'none';
   show();
 }
 function openEdit(id){
@@ -1084,7 +1145,8 @@ function openEdit(id){
             description: e.description || '', receiptUrl: e.receipt_url || null, receiptFileName: null,
             receiptUploading: false, receiptError: null, payerOpen: false, tipCustomOpen: false,
             showShares: e.allocation.some(a => Number(a.weight) !== 1), at: new Date(e.occurred_at),
-            alloc: e.allocation.map(a => ({ p:a.person_id, w:Number(a.weight) })) };
+            alloc: e.allocation.map(a => ({ p:a.person_id, w:Number(a.weight) })),
+            stopId: e.stop_id, stopPickerOpen: false };
   $('#shTitle').textContent = 'Edit expense';
   // Editing is a one-off action on a specific, already-existing expense —
   // this context line is genuinely new information each time, not a
@@ -1182,6 +1244,36 @@ function renderSheet(){
     draft.payerOpen = false;
     renderSheet();
   });
+
+  // Stop picker — edit mode only, and only worth showing with 2+ stops
+  // (nothing to move to otherwise). Fixes the "forgot to log We Moved
+  // before the next round" case without inventing a new primitive —
+  // just lets stop_id be reassigned like payer_id already is.
+  if(draft.editing && stops.length > 1){
+    $('#stopPickRow').style.display = 'flex';
+    const curIdx = stops.findIndex(s => s.id === draft.stopId);
+    const curStop = stops[curIdx];
+    $('#stopPillName').textContent = curStop ? (curStop.name ?? 'Stop ' + (curIdx+1)) : 'Choose a stop';
+    $('#stopPill').setAttribute('aria-expanded', String(draft.stopPickerOpen));
+    $('#stopPill').onclick = () => {
+      draft.stopPickerOpen = !draft.stopPickerOpen;
+      renderSheet();
+      if(draft.stopPickerOpen) requestAnimationFrame(() =>
+        ($('#stopPickerRow').querySelector('[data-stop].on') || $('#stopPickerRow').querySelector('[data-stop]'))?.focus());
+    };
+    $('#stopPickerRow').style.display = draft.stopPickerOpen ? 'flex' : 'none';
+    $('#stopPickerRow').innerHTML = stops.map((s,i) => `
+      <button class="${draft.stopId===s.id?'on':''}" data-stop="${s.id}" aria-pressed="${draft.stopId===s.id}">
+        ${escapeHtml(s.name ?? 'Stop ' + (i+1))}</button>`).join('');
+    $('#stopPickerRow').querySelectorAll('[data-stop]').forEach(b => b.onclick = () => {
+      draft.stopId = b.dataset.stop;
+      draft.stopPickerOpen = false;
+      renderSheet();
+    });
+  } else {
+    $('#stopPickRow').style.display = 'none';
+    $('#stopPickerRow').style.display = 'none';
+  }
 
   // Amount — tip presets are always visible now (not opt-in). draft.tip
   // is 0 until a preset or custom % is actively chosen; nothing is
@@ -1500,7 +1592,7 @@ $('#confirmBtn').onclick = async () => {
   if(draft.editing){
     const { error: e1 } = await sb.from('expense')
       .update({ payer_id: draft.payer, description: draft.description?.trim() || null,
-                 receipt_url: draft.receiptUrl || null })
+                 receipt_url: draft.receiptUrl || null, stop_id: draft.stopId ?? null })
       .eq('id', draft.editing);
     if(e1){ $('#confirmBtn').disabled = false; $('#confirmBtn').textContent = prevLabel; return toast(e1.message, true); }
     await sb.from('allocation').delete().eq('expense_id', draft.editing);
@@ -1580,7 +1672,10 @@ function showGuide(){
       <div class="guide-item"><b>Presence drives the split.</b> Tap someone out when they leave — new rounds skip them automatically.</div>
       <div class="guide-item"><b>Add Round</b> when someone buys. The split defaults to whoever's here.</div>
       <div class="guide-item"><b>Add Stop</b> when the group moves to a new place.</div>
+      <div class="guide-item"><b>Flag</b> an expense to dispute it — it's held out of the tab (not deleted) until someone unflags it.</div>
+      <div class="guide-item"><b>Tap any round or expense</b> to edit it — who paid, the split, or which stop it belongs to.</div>
       <div class="guide-item"><b>Last Call</b> closes the night and works out who pays who.</div>
+      <div class="guide-item"><b>Mark Paid</b> (after Last Call) is just a checkbox — the app never moves real money. Use Venmo, cash, whatever, then mark it once you've actually been paid.</div>
       <div class="guide-item">Everything updates live for the whole group.</div>
     </div>
     <button id="guideClose" style="margin-top:6px">Got it</button>`;
@@ -1644,6 +1739,7 @@ $('#htShareNight').onclick  = async () => {
   if(result === 'shared') toast('Shared');
 };
 $('#htSwitchNight').onclick = () => { closeNightMenu(false); confirmSwitchNight(); };
+$('#htChangeName').onclick  = () => { closeNightMenu(false); confirmChangeName(); };
 $('#htLeaveNight').onclick  = () => { closeNightMenu(false); confirmLeaveNight(); };
 $('#htEndNight').onclick    = () => { closeNightMenu(false); if(isHost()) confirmLastCall(); };
 

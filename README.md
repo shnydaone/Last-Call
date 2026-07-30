@@ -101,6 +101,10 @@ Supabase project `last-call`. See KNOWLEDGE.md for schema, RPCs, and the
 architectural decisions (derived balances, anonymous auth, settlement
 snapshots, etc.) that shape how the code is written.
 
+A daily `pg_cron` job auto-closes any night with no activity for 7+ days
+(`auto_close_stale_nights`, see KNOWLEDGE.md) — nights don't stay open
+forever just because nobody remembered to hit Last Call.
+
 One Storage bucket, `receipts` (public, 10MB cap), for attached receipt
 photos. See KNOWLEDGE.md for the access-control tradeoff that comes with
 "public."
