@@ -5,6 +5,48 @@ this is planning/reference material, not a spec for current code. Treat
 figures and tiers as a starting proposal to revisit before committing to any
 of it.
 
+## Competitive landscape (checked July 2026)
+
+Two genuinely different clusters of "close" competitors — worth keeping
+separate, because they compete with different parts of this app, not the
+whole thing.
+
+**Ongoing ledger apps** — Splitwise (100M+ downloads, the category
+default), Tricount, Settle Up, SplitMyExpenses. Built for *recurring*
+shared expenses over weeks/months: roommates, rent, a multi-day trip.
+Running balance, settle whenever. This is the opposite of what Last Call
+is for — these want to remember your group forever; Last Call wants to
+close out and forget. Splitwise's free tier has also gotten meaningfully
+worse in 2026 (daily expense caps, forced ad countdowns before logging an
+expense, receipt scanning paywalled to Pro) — a real opening for "the free
+tier just isn't annoying," but not a moat, since they could reverse that
+anytime.
+
+**One-time receipt scanners** — splitty, Tab, splyt, Split Check,
+TabSplit. This is the closer comparison in spirit: photograph a receipt,
+everyone taps to claim their items, split calculated automatically,
+Venmo/Cash App to settle. Some (Tab, TabSplit) already do live multi-
+person collaboration on one bill via a shared code, which is the same
+trick Last Call uses for a whole night, just scoped to a single check.
+None of them model a *night* — no stops, no presence, no "who's still
+here." Each is built and marketed around one receipt, one moment, done.
+
+### What's actually different about Last Call, stated plainly
+
+- **Presence-based, not receipt-based.** Nothing gets photographed or
+  scanned. A round is logged the moment it happens, split among whoever's
+  tapped in right now — there's no bill to reconstruct after the fact.
+- **The whole night is the unit, not one bill.** Stops are a first-class
+  concept; every receipt-scanner competitor is explicitly single-bill.
+- **A session, not a ledger.** Deliberately the opposite of Splitwise/
+  Tricount's core value prop — no persistent group to maintain, which is
+  also exactly why "permanent history" is a plausible Plus feature and
+  not a free-tier given (see below).
+- **Tap-out changes live math**, not just who claims which line item.
+- **Honest non-differentiator:** most competitors also just deep-link to
+  Venmo/Cash App rather than moving money themselves. Last Call isn't
+  ahead here, it's following the same safe pattern everyone already uses.
+
 ## Core principle
 
 **Monetize the host, not the guests.** Nobody should need to pay, subscribe,
